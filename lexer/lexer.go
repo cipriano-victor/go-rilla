@@ -25,6 +25,14 @@ func (l *Lexer) readCharacter() {
 	l.readPosition += 1
 }
 
+func (l *Lexer) peekCharacter() byte {
+	if l.readPosition >= len(l.input) {
+		return 0
+	} else {
+		return l.input[l.readPosition]
+	}
+}
+
 func (l *Lexer) NextToken() token.Token {
 	var tok token.Token
 
@@ -32,7 +40,7 @@ func (l *Lexer) NextToken() token.Token {
 
 	switch l.character {
 	case '=':
-		tok = newToken(token.ASSIGN, l.character)
+		tok = makeTwoCharacterToken(l, '=', token.EQUALS, token.ASSIGN)
 	case '+':
 		tok = newToken(token.PLUS, l.character)
 	case '(':
@@ -47,6 +55,18 @@ func (l *Lexer) NextToken() token.Token {
 		tok = newToken(token.COMMA, l.character)
 	case ';':
 		tok = newToken(token.SEMICOLON, l.character)
+	case '!':
+		tok = makeTwoCharacterToken(l, '=', token.NOT_EQUALS, token.BANG)
+	case '-':
+		tok = newToken(token.MINUS, l.character)
+	case '/':
+		tok = newToken(token.SLASH, l.character)
+	case '*':
+		tok = newToken(token.ASTERISK, l.character)
+	case '<':
+		tok = newToken(token.LESS_THAN, l.character)
+	case '>':
+		tok = newToken(token.GREATER_THAN, l.character)
 	case 0:
 		tok.Literal = ""
 		tok.Type = token.EOF
@@ -92,4 +112,15 @@ func isLetter(character byte) bool {
 
 func isDigit(character byte) bool {
 	return '0' <= character && character <= '9'
+}
+
+func makeTwoCharacterToken(l *Lexer, expected byte, twoCharType, oneCharType token.TokenType) token.Token {
+	if l.peekCharacter() == expected {
+		character := l.character
+		l.readCharacter()
+		literal := string(character) + string(l.character)
+		return token.Token{Type: twoCharType, Literal: literal}
+	} else {
+		return newToken(oneCharType, l.character)
+	}
 }

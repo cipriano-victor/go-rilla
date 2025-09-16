@@ -7,12 +7,26 @@ import (
 
 func TestNextToken(t *testing.T) {
 	input := `let five = 5;
-	let ten = 10;
-	let add = fn(x, y) {
-	x + y;
-	};
-	let result = add(five, ten);
-	`
+let ten = 10;
+
+let add = fn(x, y) {
+  x + y;
+};
+
+let result = add(five, ten);
+!-/*5;
+5 < 10 > 5;
+
+if (5 < 10) {
+	return true;
+} else {
+	return false;
+}
+
+10 == 10;
+10 != 9;
+`
+
 	tests := []struct {
 		expectedType    token.TokenType
 		expectedLiteral string
@@ -53,20 +67,59 @@ func TestNextToken(t *testing.T) {
 		{token.IDENTIFIER, "ten"},
 		{token.RIGHT_PARENTHESIS, ")"},
 		{token.SEMICOLON, ";"},
+		{token.BANG, "!"},
+		{token.MINUS, "-"},
+		{token.SLASH, "/"},
+		{token.ASTERISK, "*"},
+		{token.INTEGER, "5"},
+		{token.SEMICOLON, ";"},
+		{token.INTEGER, "5"},
+		{token.LESS_THAN, "<"},
+		{token.INTEGER, "10"},
+		{token.GREATER_THAN, ">"},
+		{token.INTEGER, "5"},
+		{token.SEMICOLON, ";"},
+		{token.IF, "if"},
+		{token.LEFT_PARENTHESIS, "("},
+		{token.INTEGER, "5"},
+		{token.LESS_THAN, "<"},
+		{token.INTEGER, "10"},
+		{token.RIGHT_PARENTHESIS, ")"},
+		{token.LEFT_BRACE, "{"},
+		{token.RETURN, "return"},
+		{token.TRUE, "true"},
+		{token.SEMICOLON, ";"},
+		{token.RIGHT_BRACE, "}"},
+		{token.ELSE, "else"},
+		{token.LEFT_BRACE, "{"},
+		{token.RETURN, "return"},
+		{token.FALSE, "false"},
+		{token.SEMICOLON, ";"},
+		{token.RIGHT_BRACE, "}"},
+		{token.INTEGER, "10"},
+		{token.EQUALS, "=="},
+		{token.INTEGER, "10"},
+		{token.SEMICOLON, ";"},
+		{token.INTEGER, "10"},
+		{token.NOT_EQUALS, "!="},
+		{token.INTEGER, "9"},
+		{token.SEMICOLON, ";"},
 		{token.EOF, ""},
 	}
 
 	l := New(input)
 
 	for i, tt := range tests {
-		token := l.NextToken()
+		tok := l.NextToken()
 
-		if token.Type != tt.expectedType {
-			t.Fatalf("tests[%d] - TokenType Wrong. Expected=%q, Got=%q", i, tt.expectedType, token.Type)
+		if tok.Type != tt.expectedType {
+			t.Fatalf("tests[%d] - tokentype wrong. expected=%q, got=%q",
+				i, tt.expectedType, tok.Type)
 		}
 
-		if token.Literal != tt.expectedLiteral {
-			t.Fatalf("tests[%d] -  Literal Wrong. Expected=%q, Got=%q", i, tt.expectedLiteral, token.Literal)
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("tests[%d] - literal wrong. expected=%q, got=%q",
+				i, tt.expectedLiteral, tok.Literal)
 		}
 	}
 }
