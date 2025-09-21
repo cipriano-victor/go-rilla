@@ -8,6 +8,8 @@ import (
 func TestNextToken(t *testing.T) {
 	input := `import "math" as m;
 
+!-/*>==¿
+
 let five = 5;
 let ten = 10;
 let add = fn(x, y) {
@@ -40,6 +42,14 @@ m.sqrt(9) != 4
 		{token.AS, "as"},
 		{token.IDENTIFIER, "m"},
 		{token.SEMICOLON, ";"},
+
+		{token.BANG, "!"},
+		{token.MINUS, "-"},
+		{token.SLASH, "/"},
+		{token.ASTERISK, "*"},
+		{token.GREATER_THAN, ">"},
+		{token.EQUALS, "=="},
+		{token.ILLEGAL, "¿"},
 
 		{token.LET, "let"},
 		{token.IDENTIFIER, "five"},
