@@ -1,10 +1,13 @@
 package token
 
+import "go-rilla/source"
+
 type TokenType string
 
 type Token struct {
 	Type    TokenType
 	Literal string
+	Range   source.Range
 }
 
 const (
@@ -14,6 +17,7 @@ const (
 	// Identificadores + Literales
 	IDENTIFIER = "IDENTIFIER"
 	INTEGER    = "INTEGER"
+	STRING     = "STRING"
 
 	// Operadores
 	ASSIGN       = "="
@@ -25,17 +29,20 @@ const (
 	LESS_THAN    = "<"
 	GREATER_THAN = ">"
 	EQUALS       = "=="
-	NOT_EQUALS   = "!="
+	NOT_EQUAL    = "!="
 
 	// Delimitadores
 	COMMA     = ","
 	SEMICOLON = ";"
+	COLON     = ":"
+	DOT       = "." // para acceso a miembros
 
 	LEFT_PARENTHESIS  = "("
 	RIGHT_PARENTHESIS = ")"
-
-	LEFT_BRACE  = "{"
-	RIGHT_BRACE = "}"
+	LEFT_BRACE        = "{"
+	RIGHT_BRACE       = "}"
+	LEFT_BRACKET      = "["
+	RIGHT_BRACKET     = "]"
 
 	// Palabras Clave
 	FUNCTION = "FUNCTION"
@@ -47,6 +54,10 @@ const (
 	FALSE = "FALSE"
 	IF    = "IF"
 	ELSE  = "ELSE"
+
+	// Keywords para módulos y paquetes
+	IMPORT = "IMPORT"
+	AS     = "AS"
 )
 
 var keywords = map[string]TokenType{
@@ -57,6 +68,8 @@ var keywords = map[string]TokenType{
 	"false":  FALSE,
 	"if":     IF,
 	"else":   ELSE,
+	"import": IMPORT,
+	"as":     AS,
 }
 
 func LookupIdentifier(identifier string) TokenType {
