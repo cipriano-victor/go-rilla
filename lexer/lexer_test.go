@@ -8,7 +8,7 @@ import (
 func TestNextToken(t *testing.T) {
 	input := `import "math" as m;
 
-!-/*>==¿
+!-/*>=<=¿==
 
 let five = 5;
 let ten = 10;
@@ -24,6 +24,10 @@ return true;
 return false;
 }
 
+if (a && b || c) {}
+
+five += 1;
+ten -= 1;
 
 "foo bar"
 [1, 2]
@@ -47,9 +51,10 @@ m.sqrt(9) != 4
 		{token.MINUS, "-"},
 		{token.SLASH, "/"},
 		{token.ASTERISK, "*"},
-		{token.GREATER_THAN, ">"},
-		{token.EQUALS, "=="},
+		{token.GREATER_EQUAL, ">="},
+		{token.LESS_EQUAL, "<="},
 		{token.ILLEGAL, "¿"},
+		{token.EQUALS, "=="},
 
 		{token.LET, "let"},
 		{token.IDENTIFIER, "five"},
@@ -106,6 +111,27 @@ m.sqrt(9) != 4
 		{token.FALSE, "false"},
 		{token.SEMICOLON, ";"},
 		{token.RIGHT_BRACE, "}"},
+
+		{token.IF, "if"},
+		{token.LEFT_PARENTHESIS, "("},
+		{token.IDENTIFIER, "a"},
+		{token.AND, "&&"},
+		{token.IDENTIFIER, "b"},
+		{token.OR, "||"},
+		{token.IDENTIFIER, "c"},
+		{token.RIGHT_PARENTHESIS, ")"},
+		{token.LEFT_BRACE, "{"},
+		{token.RIGHT_BRACE, "}"},
+
+		{token.IDENTIFIER, "five"},
+		{token.SUM_ASSIGN, "+="},
+		{token.INTEGER, "1"},
+		{token.SEMICOLON, ";"},
+
+		{token.IDENTIFIER, "ten"},
+		{token.SUB_ASSIGN, "-="},
+		{token.INTEGER, "1"},
+		{token.SEMICOLON, ";"},
 
 		{token.STRING, "foo bar"},
 		{token.LEFT_BRACKET, "["},

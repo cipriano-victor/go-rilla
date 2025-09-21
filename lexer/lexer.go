@@ -66,14 +66,16 @@ func (l *Lexer) NextToken() token.Token {
 	start := l.currentStart()
 
 	switch l.character {
+	case '&':
+		return makeTwoCharacterToken(l, '&', token.AND, token.ILLEGAL, start)
+	case '|':
+		return makeTwoCharacterToken(l, '|', token.OR, token.ILLEGAL, start)
 	case '=':
 		return makeTwoCharacterToken(l, '=', token.EQUALS, token.ASSIGN, start)
 	case '!':
 		return makeTwoCharacterToken(l, '=', token.NOT_EQUAL, token.BANG, start)
 	case '+':
-		tok = newToken(token.PLUS, l.character, start, l.afterCurrent())
-		l.readCharacter()
-		return tok
+		return makeTwoCharacterToken(l, '=', token.SUM_ASSIGN, token.PLUS, start)
 	case '(':
 		tok = newToken(token.LEFT_PARENTHESIS, l.character, start, l.afterCurrent())
 		l.readCharacter()
@@ -99,9 +101,7 @@ func (l *Lexer) NextToken() token.Token {
 		l.readCharacter()
 		return tok
 	case '-':
-		tok = newToken(token.MINUS, l.character, start, l.afterCurrent())
-		l.readCharacter()
-		return tok
+		return makeTwoCharacterToken(l, '=', token.SUB_ASSIGN, token.MINUS, start)
 	case '/':
 		tok = newToken(token.SLASH, l.character, start, l.afterCurrent())
 		l.readCharacter()
@@ -111,13 +111,9 @@ func (l *Lexer) NextToken() token.Token {
 		l.readCharacter()
 		return tok
 	case '<':
-		tok = newToken(token.LESS_THAN, l.character, start, l.afterCurrent())
-		l.readCharacter()
-		return tok
+		return makeTwoCharacterToken(l, '=', token.LESS_EQUAL, token.LESS_THAN, start)
 	case '>':
-		tok = newToken(token.GREATER_THAN, l.character, start, l.afterCurrent())
-		l.readCharacter()
-		return tok
+		return makeTwoCharacterToken(l, '=', token.GREATER_EQUAL, token.GREATER_THAN, start)
 	case ':':
 		tok = newToken(token.COLON, l.character, start, l.afterCurrent())
 		l.readCharacter()

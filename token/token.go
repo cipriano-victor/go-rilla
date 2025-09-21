@@ -28,8 +28,16 @@ const (
 	ASTERISK     = "*"
 	LESS_THAN    = "<"
 	GREATER_THAN = ">"
-	EQUALS       = "=="
-	NOT_EQUAL    = "!="
+
+	// Operadores de dos caracteres
+	LESS_EQUAL    = "<="
+	GREATER_EQUAL = ">="
+	EQUALS        = "=="
+	NOT_EQUAL     = "!="
+	AND           = "&&"
+	OR            = "||"
+	SUM_ASSIGN    = "+="
+	SUB_ASSIGN    = "-="
 
 	// Delimitadores
 	COMMA     = ","
