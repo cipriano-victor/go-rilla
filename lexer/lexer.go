@@ -1,126 +1,226 @@
 package lexer
 
-import "go-rilla/token"
+import (
+	"go-rilla/source"
+	"go-rilla/token"
+	"unicode"
+	"unicode/utf8"
+)
 
 type Lexer struct {
-	input        string
-	position     int  // posición actual en input (apunta al carácter actual)
-	readPosition int  // posición de lectura (apunta al siguiente carácter a leer)
-	character    byte // carácter actual bajo revisión
+	input      string
+	offset     int             // posición actual en input (apunta al carácter actual)
+	readOffset int             // posición de lectura (apunta al siguiente carácter a leer)
+	character  rune            // carácter actual bajo revisión
+	position   source.Position // posición del carácter actual (línea y columna)
 }
 
 func New(input string) *Lexer {
-	l := &Lexer{input: input}
+	l := &Lexer{input: input, position: source.Position{Line: 1, Column: 1}}
 	l.readCharacter()
 	return l
 }
 
 func (l *Lexer) readCharacter() {
-	if l.readPosition >= len(l.input) {
+	// avanzar a la siguiente runa
+	if l.readOffset >= len(l.input) {
+		// EOF virtual
+		if l.character == '\n' {
+			l.position.Line++
+			l.position.Column = 1
+		} else if l.offset != 0 {
+			l.position.Column++
+		}
+		l.offset = l.readOffset
 		l.character = 0
-	} else {
-		l.character = l.input[l.readPosition]
+		return
 	}
-	l.position = l.readPosition
-	l.readPosition += 1
+
+	// actualizar posición según la runa anterior
+	if l.offset != 0 || l.position.Line != 1 || l.position.Column != 1 {
+		if l.character == '\n' {
+			l.position.Line++
+			l.position.Column = 1
+		} else {
+			l.position.Column++
+		}
+	}
+
+	l.offset = l.readOffset
+	r, w := utf8.DecodeRuneInString(l.input[l.readOffset:])
+	l.character = r
+	l.readOffset += w
 }
 
-func (l *Lexer) peekCharacter() byte {
-	if l.readPosition >= len(l.input) {
+func (l *Lexer) peekCharacter() rune {
+	if l.readOffset >= len(l.input) {
 		return 0
-	} else {
-		return l.input[l.readPosition]
 	}
+	r, _ := utf8.DecodeRuneInString(l.input[l.readOffset:])
+	return r
 }
 
 func (l *Lexer) NextToken() token.Token {
 	var tok token.Token
-
 	l.skipWhitespace()
+	start := l.currentStart()
 
 	switch l.character {
 	case '=':
-		tok = makeTwoCharacterToken(l, '=', token.EQUALS, token.ASSIGN)
-	case '+':
-		tok = newToken(token.PLUS, l.character)
-	case '(':
-		tok = newToken(token.LEFT_PARENTHESIS, l.character)
-	case ')':
-		tok = newToken(token.RIGHT_PARENTHESIS, l.character)
-	case '{':
-		tok = newToken(token.LEFT_BRACE, l.character)
-	case '}':
-		tok = newToken(token.RIGHT_BRACE, l.character)
-	case ',':
-		tok = newToken(token.COMMA, l.character)
-	case ';':
-		tok = newToken(token.SEMICOLON, l.character)
+		return makeTwoCharacterToken(l, '=', token.EQUALS, token.ASSIGN, start)
 	case '!':
-		tok = makeTwoCharacterToken(l, '=', token.NOT_EQUALS, token.BANG)
+		return makeTwoCharacterToken(l, '=', token.NOT_EQUAL, token.BANG, start)
+	case '+':
+		tok = newToken(token.PLUS, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
+	case '(':
+		tok = newToken(token.LEFT_PARENTHESIS, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
+	case ')':
+		tok = newToken(token.RIGHT_PARENTHESIS, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
+	case '{':
+		tok = newToken(token.LEFT_BRACE, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
+	case '}':
+		tok = newToken(token.RIGHT_BRACE, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
+	case ',':
+		tok = newToken(token.COMMA, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
+	case ';':
+		tok = newToken(token.SEMICOLON, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
 	case '-':
-		tok = newToken(token.MINUS, l.character)
+		tok = newToken(token.MINUS, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
 	case '/':
-		tok = newToken(token.SLASH, l.character)
+		tok = newToken(token.SLASH, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
 	case '*':
-		tok = newToken(token.ASTERISK, l.character)
+		tok = newToken(token.ASTERISK, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
 	case '<':
-		tok = newToken(token.LESS_THAN, l.character)
+		tok = newToken(token.LESS_THAN, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
 	case '>':
-		tok = newToken(token.GREATER_THAN, l.character)
+		tok = newToken(token.GREATER_THAN, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
+	case ':':
+		tok = newToken(token.COLON, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
+	case '.':
+		tok = newToken(token.DOT, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
+	case '[':
+		tok = newToken(token.LEFT_BRACKET, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
+	case ']':
+		tok = newToken(token.RIGHT_BRACKET, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
+	case '"':
+		s := l.readString()
+		end := l.currentStart() // estamos parados en la comilla de cierre
+		l.readCharacter()       // consumir la comilla de cierre
+		return token.Token{Type: token.STRING, Literal: s, Range: source.Range{Start: start, End: end}}
 	case 0:
-		tok.Literal = ""
-		tok.Type = token.EOF
+		return token.Token{Type: token.EOF, Literal: "", Range: source.Range{Start: start, End: start}}
 	default:
 		if isLetter(l.character) {
-			tok.Literal = l.read(isLetter)
-			tok.Type = token.LookupIdentifier(tok.Literal)
-			return tok
-		} else if isDigit(l.character) {
-			tok.Literal = l.read(isDigit)
-			tok.Type = token.INTEGER
-			return tok
-		} else {
-			tok = newToken(token.ILLEGAL, l.character)
+			literal := l.read(isLetter)
+			return token.Token{Type: token.LookupIdentifier(literal), Literal: literal, Range: source.Range{Start: start, End: l.currentStart()}}
 		}
+		if isDigit(l.character) {
+			literal := l.read(isDigit)
+			return token.Token{Type: token.INTEGER, Literal: literal, Range: source.Range{Start: start, End: l.currentStart()}}
+		}
+		tok = newToken(token.ILLEGAL, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
 	}
-
-	l.readCharacter()
-	return tok
 }
 
-func newToken(tokenType token.TokenType, character byte) token.Token {
-	return token.Token{Type: tokenType, Literal: string(character)}
+func newToken(tokenType token.TokenType, character rune, start, end source.Position) token.Token {
+	return token.Token{Type: tokenType, Literal: string(character), Range: source.Range{Start: start, End: end}}
 }
 
 func (l *Lexer) skipWhitespace() {
-	for l.character == ' ' || l.character == '\t' || l.character == '\n' || l.character == '\r' {
+	for unicode.IsSpace(rune(l.character)) {
 		l.readCharacter()
 	}
 }
 
-func (l *Lexer) read(isValid func(byte) bool) string {
-	position := l.position
+func (l *Lexer) read(isValid func(rune) bool) string {
+	offset := l.offset
 	for isValid(l.character) {
 		l.readCharacter()
 	}
-	return l.input[position:l.position]
+	return l.input[offset:l.offset]
 }
 
-func isLetter(character byte) bool {
-	return 'a' <= character && character <= 'z' || 'A' <= character && character <= 'Z' || character == '_'
+func (l *Lexer) readString() string {
+	l.readCharacter() // consumir comilla de apertura y posicionarnos en el primer carácter del contenido
+	start := l.offset
+	for l.character != '"' && l.character != 0 {
+		// (nota) escape básico: \" — lo dejamos para la siguiente iteración
+		if l.character == '\\' && l.peekCharacter() == '"' {
+			l.readCharacter()
+		}
+		l.readCharacter()
+	}
+	return l.input[start:l.offset]
 }
 
-func isDigit(character byte) bool {
+func (l *Lexer) currentStart() source.Position {
+	return source.Position{Offset: l.offset, Line: l.position.Line, Column: l.position.Column}
+}
+
+func (l *Lexer) afterCurrent() source.Position {
+	// Posición inmediatamente después del rune actual
+	// (End exclusivo) — columna aproximada +1
+	col := l.position.Column
+	if l.character == '\n' {
+		// tras un \n, la próxima runa estará en la línea siguiente, col=1
+		return source.Position{Offset: l.readOffset, Line: l.position.Line + 1, Column: 1}
+	}
+	return source.Position{Offset: l.readOffset, Line: l.position.Line, Column: col + 1}
+}
+
+func isLetter(character rune) bool {
+	return ('a' <= character && character <= 'z') || ('A' <= character && character <= 'Z') || character == '_'
+}
+
+func isDigit(character rune) bool {
 	return '0' <= character && character <= '9'
 }
 
-func makeTwoCharacterToken(l *Lexer, expected byte, twoCharType, oneCharType token.TokenType) token.Token {
+func makeTwoCharacterToken(l *Lexer, expected rune, twoCharType, oneCharType token.TokenType, start source.Position) token.Token {
 	if l.peekCharacter() == expected {
-		character := l.character
+		first := l.character
 		l.readCharacter()
-		literal := string(character) + string(l.character)
-		return token.Token{Type: twoCharType, Literal: literal}
-	} else {
-		return newToken(oneCharType, l.character)
+		literal := string(first) + string(l.character)
+		end := l.afterCurrent()
+		l.readCharacter()
+		return token.Token{Type: twoCharType, Literal: literal, Range: source.Range{Start: start, End: end}}
 	}
+	literal := string(l.character)
+	end := l.afterCurrent()
+	l.readCharacter()
+	return token.Token{Type: oneCharType, Literal: literal, Range: source.Range{Start: start, End: end}}
 }
