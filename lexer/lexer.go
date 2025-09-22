@@ -143,8 +143,18 @@ func (l *Lexer) NextToken() token.Token {
 			return token.Token{Type: token.LookupIdentifier(literal), Literal: literal, Range: source.Range{Start: start, End: l.currentStart()}}
 		}
 		if isDigit(l.character) {
-			literal := l.read(isDigit)
-			return token.Token{Type: token.INTEGER, Literal: literal, Range: source.Range{Start: start, End: l.currentStart()}}
+			intPart := l.read(isDigit)
+			if l.character == ',' {
+				if l.peekCharacter() == ' ' {
+					return token.Token{Type: token.INTEGER, Literal: intPart, Range: source.Range{Start: start, End: l.currentStart()}}
+				} else if isDigit(l.peekCharacter()) {
+					l.readCharacter() // consumir la coma
+					decimalPart := l.read(isDigit)
+					literal := intPart + "," + decimalPart
+					return token.Token{Type: token.FLOAT, Literal: literal, Range: source.Range{Start: start, End: l.currentStart()}}
+				}
+			}
+			return token.Token{Type: token.INTEGER, Literal: intPart, Range: source.Range{Start: start, End: l.currentStart()}}
 		}
 		tok = newToken(token.ILLEGAL, l.character, start, l.afterCurrent())
 		l.readCharacter()

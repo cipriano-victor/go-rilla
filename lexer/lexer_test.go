@@ -35,6 +35,8 @@ ten -= 1;
 
 
 m.sqrt(9) != 4
+let decimal = 3,1415;
+let bigger_int_part = 314,15;
 `
 
 	tests := []struct {
@@ -154,6 +156,18 @@ m.sqrt(9) != 4
 		{token.RIGHT_PARENTHESIS, ")"},
 		{token.NOT_EQUAL, "!="},
 		{token.INTEGER, "4"},
+
+		{token.LET, "let"},
+		{token.IDENTIFIER, "decimal"},
+		{token.ASSIGN, "="},
+		{token.FLOAT, "3,1415"},
+		{token.SEMICOLON, ";"},
+
+		{token.LET, "let"},
+		{token.IDENTIFIER, "bigger_int_part"},
+		{token.ASSIGN, "="},
+		{token.FLOAT, "314,15"},
+		{token.SEMICOLON, ";"},
 		{token.EOF, ""},
 	}
 

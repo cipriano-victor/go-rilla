@@ -18,6 +18,7 @@ const (
 	IDENTIFIER = "IDENTIFIER"
 	INTEGER    = "INTEGER"
 	STRING     = "STRING"
+	FLOAT      = "FLOAT"
 
 	// Operadores
 	ASSIGN       = "="
