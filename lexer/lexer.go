@@ -144,15 +144,17 @@ func (l *Lexer) NextToken() token.Token {
 		}
 		if isDigit(l.character) {
 			intPart := l.read(isDigit)
-			if l.character == ',' {
-				if l.peekCharacter() == ' ' {
-					return token.Token{Type: token.INTEGER, Literal: intPart, Range: source.Range{Start: start, End: l.currentStart()}}
-				} else if isDigit(l.peekCharacter()) {
-					l.readCharacter() // consumir la coma
+			if l.character == '.' {
+				if isDigit(l.peekCharacter()) {
+					l.readCharacter()
 					decimalPart := l.read(isDigit)
-					literal := intPart + "," + decimalPart
+					literal := intPart + "." + decimalPart
 					return token.Token{Type: token.FLOAT, Literal: literal, Range: source.Range{Start: start, End: l.currentStart()}}
 				}
+				// si no hay dígito tras el punto, no es un float válido
+				literal := intPart + string(l.character)
+				l.readCharacter()
+				return token.Token{Type: token.ILLEGAL, Literal: literal, Range: source.Range{Start: start, End: l.afterCurrent()}}
 			}
 			return token.Token{Type: token.INTEGER, Literal: intPart, Range: source.Range{Start: start, End: l.currentStart()}}
 		}
