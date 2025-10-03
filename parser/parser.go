@@ -25,6 +25,23 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.INTEGER, p.parseIntegerLiteral)
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
+
+	p.infixParseFns = make(map[token.TokenType]infixParseFn)
+	p.registerInfix(token.PLUS, p.parseInfixExpression)
+	p.registerInfix(token.MINUS, p.parseInfixExpression)
+	p.registerInfix(token.ASTERISK, p.parseInfixExpression)
+	p.registerInfix(token.SLASH, p.parseInfixExpression)
+	p.registerInfix(token.ASSIGN, p.parseInfixExpression)
+	p.registerInfix(token.EQUALS, p.parseInfixExpression)
+	p.registerInfix(token.NOT_EQUAL, p.parseInfixExpression)
+	p.registerInfix(token.LESS_THAN, p.parseInfixExpression)
+	p.registerInfix(token.GREATER_THAN, p.parseInfixExpression)
+	p.registerInfix(token.LESS_EQUAL, p.parseInfixExpression)
+	p.registerInfix(token.GREATER_EQUAL, p.parseInfixExpression)
+	p.registerInfix(token.SUM_ASSIGN, p.parseInfixExpression)
+	p.registerInfix(token.SUB_ASSIGN, p.parseInfixExpression)
+	p.registerInfix(token.AND, p.parseInfixExpression)
+	p.registerInfix(token.OR, p.parseInfixExpression)
 	// Leer dos tokens, para inicializar currentToken y peekToken
 	p.nextToken()
 	p.nextToken()
@@ -51,9 +68,7 @@ func (p *Parser) ParseProgram() *ast.Program {
 
 	for !p.currentTokenIs(token.EOF) {
 		stmt := p.parseStatement()
-		if stmt != nil {
-			program.Statements = append(program.Statements, stmt)
-		}
+		program.Statements = append(program.Statements, stmt)
 		p.nextToken()
 	}
 	return program
@@ -166,8 +181,18 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 		p.noPrefixParseFnError(p.currentToken.Type)
 		return nil
 	}
-
 	leftExp := prefix()
+
+	for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
+		infix := p.infixParseFns[p.peekToken.Type]
+		if infix == nil {
+			return leftExp
+		}
+
+		p.nextToken()
+		leftExp = infix(leftExp)
+	}
+
 	return leftExp
 }
 
@@ -199,4 +224,61 @@ func (p *Parser) parsePrefixExpression() ast.Expression {
 	p.nextToken()
 	expression.Right = p.parseExpression(PREFIX)
 	return expression
+}
+
+var precedences = map[token.TokenType]int{
+	token.EQUALS:        EQUALS,
+	token.NOT_EQUAL:     EQUALS,
+	token.AND:           EQUALS,
+	token.OR:            EQUALS,
+	token.ASSIGN:        EQUALS,
+	token.LESS_THAN:     LESSGREATER,
+	token.GREATER_THAN:  LESSGREATER,
+	token.LESS_EQUAL:    LESSGREATER,
+	token.GREATER_EQUAL: LESSGREATER,
+	token.PLUS:          SUM,
+	token.MINUS:         SUM,
+	token.SUM_ASSIGN:    SUM,
+	token.SUB_ASSIGN:    SUM,
+	token.ASTERISK:      PRODUCT,
+	token.SLASH:         PRODUCT,
+}
+
+func (p *Parser) peekPrecedence() int {
+	if p, ok := precedences[p.peekToken.Type]; ok {
+		return p
+	}
+	return LOWEST
+}
+
+func (p *Parser) currentPrecedence() int {
+	if p, ok := precedences[p.currentToken.Type]; ok {
+		return p
+	}
+	return LOWEST
+}
+
+func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
+	expression := &ast.InfixExpression{
+		Token:    p.currentToken,
+		Operator: infixOperatorLiteral(p.currentToken),
+		Left:     left,
+	}
+
+	precedence := p.currentPrecedence()
+	p.nextToken()
+	expression.Right = p.parseExpression(precedence)
+
+	return expression
+}
+
+func infixOperatorLiteral(tok token.Token) string {
+	switch tok.Type {
+	case token.SUM_ASSIGN:
+		return string(token.PLUS)
+	case token.SUB_ASSIGN:
+		return string(token.MINUS)
+	default:
+		return tok.Literal
+	}
 }
