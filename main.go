@@ -14,7 +14,8 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Bienvenido a Go-Rilla %s! \n", user.Username)
-	fmt.Printf("Presiona Ctrl+C o escribe 'exit' para salir \n")
+	fmt.Printf("Welcome to Go-Rilla, %s! \n", user.Username)
+	fmt.Printf("Feel free to write any kind of commands \n")
+	fmt.Printf("Press Ctrl+C or type 'exit' to leave \n")
 	repl.Start(os.Stdin, os.Stdout)
 }
