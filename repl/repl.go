@@ -5,7 +5,15 @@ import (
 	"fmt"
 	"go-rilla/lexer"
 	"go-rilla/parser"
+	"go-rilla/token"
 	"io"
+)
+
+type Mode string
+
+const (
+	ModeParser  Mode = "parser"
+	ModeScanner Mode = "scanner"
 )
 
 const PROMPT = ">> "
@@ -24,6 +32,18 @@ const GORILLA_FACE = `
 `
 
 func Start(in io.Reader, out io.Writer) {
+	StartParser(in, out)
+}
+
+func StartParser(in io.Reader, out io.Writer) {
+	startRepl(ModeParser, in, out)
+}
+
+func StartScanner(in io.Reader, out io.Writer) {
+	startRepl(ModeScanner, in, out)
+}
+
+func startRepl(mode Mode, in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
 	for {
 		fmt.Print(PROMPT)
@@ -38,17 +58,41 @@ func Start(in io.Reader, out io.Writer) {
 			return
 		}
 
-		l := lexer.New(line)
-		p := parser.New(l)
-		program := p.ParseProgram()
+		processLine(mode, line, out)
+	}
+}
 
-		if len(p.Errors()) != 0 {
-			printParserErrors(out, p.Errors())
-			continue
+func processLine(mode Mode, line string, out io.Writer) {
+	switch mode {
+	case ModeScanner:
+		runScanner(line, out)
+	default:
+		runParser(line, out)
+	}
+}
+
+func runParser(line string, out io.Writer) {
+	l := lexer.New(line)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) != 0 {
+		printParserErrors(out, p.Errors())
+		return
+	}
+
+	io.WriteString(out, program.String())
+	io.WriteString(out, "\n")
+}
+
+func runScanner(line string, out io.Writer) {
+	l := lexer.New(line)
+	for {
+		tok := l.NextToken()
+		fmt.Fprintf(out, "%s\t%q\n", tok.Type, tok.Literal)
+		if tok.Type == token.EOF {
+			break
 		}
-
-		io.WriteString(out, program.String())
-		io.WriteString(out, "\n")
 	}
 }
 
