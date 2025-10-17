@@ -1,6 +1,7 @@
 package lexer
 
 import (
+	"go-rilla/diag"
 	"go-rilla/source"
 	"go-rilla/token"
 	"unicode"
@@ -8,11 +9,25 @@ import (
 )
 
 type Lexer struct {
-	input      string
-	offset     int             // posición actual en input (apunta al carácter actual)
-	readOffset int             // posición de lectura (apunta al siguiente carácter a leer)
-	character  rune            // carácter actual bajo revisión
-	position   source.Position // posición del carácter actual (línea y columna)
+	input       string
+	offset      int             // posición actual en input (apunta al carácter actual)
+	readOffset  int             // posición de lectura (apunta al siguiente carácter a leer)
+	character   rune            // carácter actual bajo revisión
+	position    source.Position // posición del carácter actual (línea y columna)
+	diagnostics []diag.Diagnostic
+}
+
+// Diagnostics devuelve los diagnósticos léxicos acumulados.
+func (l *Lexer) Diagnostics() []diag.Diagnostic { return l.diagnostics }
+
+func (l *Lexer) addDiag(level diag.Level, code, msg, hint string, start, end source.Position) {
+	l.diagnostics = append(l.diagnostics, diag.Diagnostic{
+		Level:   level,
+		Code:    code,
+		Message: msg,
+		Hint:    hint,
+		Range:   source.Range{Start: start, End: end},
+	})
 }
 
 func New(input string) *Lexer {
@@ -131,9 +146,14 @@ func (l *Lexer) NextToken() token.Token {
 		l.readCharacter()
 		return tok
 	case '"':
-		s := l.readString()
-		end := l.currentStart() // estamos parados en la comilla de cierre
-		l.readCharacter()       // consumir la comilla de cierre
+		s, closed := l.readString()
+		end := l.currentStart() // si cerró, es la comilla de cierre; si no, es EOF
+		if !closed {
+			l.addDiag(diag.Error, "LEX003", "String without closing quote", "Closing quote '\"' is missing", start, end)
+			// no consumimos comilla porque no la hay; solo devolvemos ILLEGAL
+			return token.Token{Type: token.ILLEGAL, Literal: s, Range: source.Range{Start: start, End: end}}
+		}
+		l.readCharacter() // consumir la comilla de cierre
 		return token.Token{Type: token.STRING, Literal: s, Range: source.Range{Start: start, End: end}}
 	case 0:
 		return token.Token{Type: token.EOF, Literal: "", Range: source.Range{Start: start, End: start}}
@@ -153,12 +173,15 @@ func (l *Lexer) NextToken() token.Token {
 				}
 				// si no hay dígito tras el punto, no es un float válido
 				literal := intPart + string(l.character)
+				end := l.afterCurrent()
+				l.addDiag(diag.Error, "LEX002", "Malformed float literal", "At least one digit is expected after the decimal point", start, end)
 				l.readCharacter()
-				return token.Token{Type: token.ILLEGAL, Literal: literal, Range: source.Range{Start: start, End: l.afterCurrent()}}
+				return token.Token{Type: token.ILLEGAL, Literal: literal, Range: source.Range{Start: start, End: end}}
 			}
 			return token.Token{Type: token.INTEGER, Literal: intPart, Range: source.Range{Start: start, End: l.currentStart()}}
 		}
 		tok = newToken(token.ILLEGAL, l.character, start, l.afterCurrent())
+		l.addDiag(diag.Error, "LEX001", "Illegal Character", "Character not recognized by the language", start, l.afterCurrent())
 		l.readCharacter()
 		return tok
 	}
@@ -182,17 +205,19 @@ func (l *Lexer) read(isValid func(rune) bool) string {
 	return l.input[offset:l.offset]
 }
 
-func (l *Lexer) readString() string {
+func (l *Lexer) readString() (string, bool) {
 	l.readCharacter() // consumir comilla de apertura y posicionarnos en el primer carácter del contenido
 	start := l.offset
 	for l.character != '"' && l.character != 0 {
-		// (nota) escape básico: \" — lo dejamos para la siguiente iteración
+		// (nota) escape básico: \" — queda como TODO el resto
 		if l.character == '\\' && l.peekCharacter() == '"' {
 			l.readCharacter()
 		}
 		l.readCharacter()
 	}
-	return l.input[start:l.offset]
+
+	closed := (l.character == '"')
+	return l.input[start:l.offset], closed
 }
 
 func (l *Lexer) currentStart() source.Position {
