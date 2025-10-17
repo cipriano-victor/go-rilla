@@ -19,20 +19,6 @@ func TestString(t *testing.T) {
 					Value: "anotherVar",
 				},
 			},
-			// &ReturnStatement{
-			// 	Token: token.Token{Type: token.RETURN, Literal: "return"},
-			// 	ReturnValue: &Identifier{
-			// 		Token: token.Token{Type: token.IDENTIFIER, Literal: "myVar"},
-			// 		Value: "myVar",
-			// 	},
-			// },
-			// &ExpressionStatement{
-			// 	Token: token.Token{Type: token.IDENTIFIER, Literal: "myVar"},
-			// 	Expression: &Identifier{
-			// 		Token: token.Token{Type: token.IDENTIFIER, Literal: "myVar"},
-			// 		Value: "myVar",
-			// 	},
-			// },
 		},
 	}
 
