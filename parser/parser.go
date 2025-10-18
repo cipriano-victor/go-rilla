@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"go-rilla/ast"
+	"go-rilla/diag"
 	"go-rilla/lexer"
 	"go-rilla/token"
 	"strconv"
@@ -15,6 +16,13 @@ type Parser struct {
 	errors         []string
 	prefixParseFns map[token.TokenType]prefixParseFn
 	infixParseFns  map[token.TokenType]infixParseFn
+	diagnostics    []diag.Diagnostic
+}
+
+func (p *Parser) Diagnostics() []diag.Diagnostic { return p.diagnostics }
+
+func (p *Parser) addDiag(d diag.Diagnostic) {
+	p.diagnostics = append(p.diagnostics, d)
 }
 
 func New(l *lexer.Lexer) *Parser {
@@ -24,6 +32,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.IDENTIFIER, p.parseIdentifier)
 	p.registerPrefix(token.INTEGER, p.parseIntegerLiteral)
 	p.registerPrefix(token.FLOAT, p.parseFloatLiteral)
+	p.registerPrefix(token.STRING, p.parseStringLiteral)
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
 	p.registerPrefix(token.TRUE, p.parseBoolean)
@@ -49,6 +58,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.AND, p.parseInfixExpression)
 	p.registerInfix(token.OR, p.parseInfixExpression)
 	p.registerInfix(token.LEFT_PARENTHESIS, p.parseCallExpression)
+	p.registerInfix(token.DOT, p.parseMemberExpression)
 
 	// Leer dos tokens, para inicializar currentToken y peekToken
 	p.nextToken()
@@ -61,9 +71,7 @@ func (p *Parser) parseIdentifier() ast.Expression {
 	return &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal}
 }
 
-func (p *Parser) Errors() []string {
-	return p.errors
-}
+func (p *Parser) Errors() []string { return p.errors }
 
 func (p *Parser) nextToken() {
 	p.currentToken = p.peekToken
@@ -88,6 +96,8 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseLetStatement()
 	case token.RETURN:
 		return p.parseReturnStatement()
+	case token.IMPORT:
+		return p.parseImportStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -110,13 +120,37 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	return stmt
 }
 
-func (p *Parser) currentTokenIs(t token.TokenType) bool {
-	return p.currentToken.Type == t
+func (p *Parser) parseImportStatement() *ast.ImportStatement {
+	stmt := &ast.ImportStatement{Token: p.currentToken}
+	if !p.expectPeek(token.STRING) {
+		return nil
+	}
+	stmt.Path = &ast.StringLiteral{Token: p.currentToken, Value: p.currentToken.Literal}
+
+	if !p.expectPeek(token.AS) {
+		msg := "Expected 'as' after import path"
+		p.errors = append(p.errors, msg)
+		p.addDiag(diag.Diagnostic{
+			Level:   diag.Error,
+			Code:    "IMP001",
+			Message: msg,
+			Hint:    "The correct form is: import \"ruta\" as alias;",
+			Range:   p.peekToken.Range,
+		})
+		return nil
+	}
+	if !p.expectPeek(token.IDENTIFIER) {
+		return nil
+	}
+	stmt.Alias = &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal}
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+	return stmt
 }
 
-func (p *Parser) peekTokenIs(t token.TokenType) bool {
-	return p.peekToken.Type == t
-}
+func (p *Parser) currentTokenIs(t token.TokenType) bool { return p.currentToken.Type == t }
+func (p *Parser) peekTokenIs(t token.TokenType) bool    { return p.peekToken.Type == t }
 
 func (p *Parser) expectPeek(t token.TokenType) bool {
 	if p.peekTokenIs(t) {
@@ -128,7 +162,15 @@ func (p *Parser) expectPeek(t token.TokenType) bool {
 }
 
 func (p *Parser) peekError(t token.TokenType) {
-	p.errors = append(p.errors, fmt.Sprintf("expected next token to be %s, got %s instead", t, p.peekToken.Type))
+	msg := fmt.Sprintf("Expected next token to be %s, got %s instead", t, p.peekToken.Type)
+	p.errors = append(p.errors, msg)
+	p.addDiag(diag.Diagnostic{
+		Level:   diag.Error,
+		Code:    "PAR001",
+		Message: msg,
+		Hint:    "Check the previous expression or a possible missing ';'",
+		Range:   p.peekToken.Range,
+	})
 }
 
 func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
@@ -156,25 +198,23 @@ func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
 
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	stmt := &ast.ExpressionStatement{Token: p.currentToken}
-
 	stmt.Expression = p.parseExpression(LOWEST)
-
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
-
 	return stmt
 }
 
 const (
 	_ int = iota
 	LOWEST
-	EQUALS      // ==
-	LESSGREATER // > or <
-	SUM         // +
-	PRODUCT     // *
+	EQUALS      // ==, !=, &&, ||, =
+	LESSGREATER // >, <, <=, >=
+	SUM         // +, -, +=, -=
+	PRODUCT     // *, /
 	PREFIX      // -X or !X
 	CALL        // myFunction(X)
+	SELECT      // a.b (más alto que CALL)
 )
 
 func (p *Parser) parseExpression(precedence int) ast.Expression {
@@ -190,53 +230,68 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 		if infix == nil {
 			return leftExp
 		}
-
 		p.nextToken()
 		leftExp = infix(leftExp)
 	}
-
 	return leftExp
 }
 
 func (p *Parser) parseIntegerLiteral() ast.Expression {
 	lit := &ast.IntegerLiteral{Token: p.currentToken}
-
 	value, err := strconv.ParseInt(p.currentToken.Literal, 0, 64)
 	if err != nil {
-		msg := fmt.Sprintf("could not parse %q as integer", p.currentToken.Literal)
+		msg := fmt.Sprintf("Could not parse %q as integer", p.currentToken.Literal)
 		p.errors = append(p.errors, msg)
+		p.addDiag(diag.Diagnostic{
+			Level:   diag.Error,
+			Code:    "LIT001",
+			Message: msg,
+			Hint:    "Value out of range or invalid format",
+			Range:   p.currentToken.Range,
+		})
 		return nil
 	}
-
 	lit.Value = value
 	return lit
 }
 
 func (p *Parser) parseFloatLiteral() ast.Expression {
 	lit := &ast.FloatLiteral{Token: p.currentToken}
-
 	value, err := strconv.ParseFloat(p.currentToken.Literal, 64)
 	if err != nil {
-		msg := fmt.Sprintf("could not parse %q as float", p.currentToken.Literal)
+		msg := fmt.Sprintf("Could not parse %q as float", p.currentToken.Literal)
 		p.errors = append(p.errors, msg)
+		p.addDiag(diag.Diagnostic{
+			Level:   diag.Error,
+			Code:    "LIT002",
+			Message: msg,
+			Hint:    "Value out of range or invalid format",
+			Range:   p.currentToken.Range,
+		})
 		return nil
 	}
-
 	lit.Value = value
 	return lit
 }
 
+func (p *Parser) parseStringLiteral() ast.Expression {
+	return &ast.StringLiteral{Token: p.currentToken, Value: p.currentToken.Literal}
+}
+
 func (p *Parser) noPrefixParseFnError(t token.TokenType) {
-	msg := fmt.Sprintf("no prefix parse function for %s found", t)
+	msg := fmt.Sprintf("No prefix parse function for %s found", t)
 	p.errors = append(p.errors, msg)
+	p.addDiag(diag.Diagnostic{
+		Level:   diag.Error,
+		Code:    "PAR002",
+		Message: msg,
+		Hint:    "Unexpected token at the beginning of an expression",
+		Range:   p.currentToken.Range,
+	})
 }
 
 func (p *Parser) parsePrefixExpression() ast.Expression {
-	expression := &ast.PrefixExpression{
-		Token:    p.currentToken,
-		Operator: p.currentToken.Literal,
-	}
-
+	expression := &ast.PrefixExpression{Token: p.currentToken, Operator: p.currentToken.Literal}
 	p.nextToken()
 	expression.Right = p.parseExpression(PREFIX)
 	return expression
@@ -259,6 +314,7 @@ var precedences = map[token.TokenType]int{
 	token.ASTERISK:         PRODUCT,
 	token.SLASH:            PRODUCT,
 	token.LEFT_PARENTHESIS: CALL,
+	token.DOT:              SELECT,
 }
 
 func (p *Parser) peekPrecedence() int {
@@ -276,17 +332,21 @@ func (p *Parser) currentPrecedence() int {
 }
 
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
-	expression := &ast.InfixExpression{
-		Token:    p.currentToken,
-		Operator: infixOperatorLiteral(p.currentToken),
-		Left:     left,
-	}
-
+	expression := &ast.InfixExpression{Token: p.currentToken, Operator: infixOperatorLiteral(p.currentToken), Left: left}
 	precedence := p.currentPrecedence()
 	p.nextToken()
 	expression.Right = p.parseExpression(precedence)
-
 	return expression
+}
+
+func (p *Parser) parseMemberExpression(left ast.Expression) ast.Expression {
+	exp := &ast.MemberExpression{Token: p.currentToken, Object: left}
+	if !p.expectPeek(token.IDENTIFIER) {
+		return nil
+	}
+	ident := &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal}
+	exp.Property = ident
+	return exp
 }
 
 func infixOperatorLiteral(tok token.Token) string {
@@ -307,11 +367,9 @@ func (p *Parser) parseBoolean() ast.Expression {
 func (p *Parser) parseGroupedExpression() ast.Expression {
 	p.nextToken()
 	exp := p.parseExpression(LOWEST)
-
 	if !p.expectPeek(token.RIGHT_PARENTHESIS) {
 		return nil
 	}
-
 	return exp
 }
 
@@ -320,20 +378,15 @@ func (p *Parser) parseIfExpression() ast.Expression {
 	if !p.expectPeek(token.LEFT_PARENTHESIS) {
 		return nil
 	}
-
 	p.nextToken()
 	expression.Condition = p.parseExpression(LOWEST)
-
 	if !p.expectPeek(token.RIGHT_PARENTHESIS) {
 		return nil
 	}
-
 	if !p.expectPeek(token.LEFT_BRACE) {
 		return nil
 	}
-
 	expression.Consequence = p.parseBlockStatement()
-
 	if p.peekTokenIs(token.ELSE) {
 		p.nextToken()
 		if !p.expectPeek(token.LEFT_BRACE) {
@@ -341,7 +394,6 @@ func (p *Parser) parseIfExpression() ast.Expression {
 		}
 		expression.Alternative = p.parseBlockStatement()
 	}
-
 	return expression
 }
 
@@ -349,58 +401,45 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	block := &ast.BlockStatement{Token: p.currentToken}
 	block.Statements = []ast.Statement{}
 	p.nextToken()
-
 	for !p.currentTokenIs(token.RIGHT_BRACE) && !p.currentTokenIs(token.EOF) {
 		stmt := p.parseStatement()
 		block.Statements = append(block.Statements, stmt)
 		p.nextToken()
 	}
-
 	return block
 }
 
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	lit := &ast.FunctionLiteral{Token: p.currentToken}
-
 	if !p.expectPeek(token.LEFT_PARENTHESIS) {
 		return nil
 	}
-
 	lit.Parameters = p.parseFunctionParameters()
-
 	if !p.expectPeek(token.LEFT_BRACE) {
 		return nil
 	}
-
 	lit.Body = p.parseBlockStatement()
-
 	return lit
 }
 
 func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 	identifiers := []*ast.Identifier{}
-
 	if p.peekTokenIs(token.RIGHT_PARENTHESIS) {
 		p.nextToken()
 		return identifiers
 	}
-
 	p.nextToken()
-
 	identifier := &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal}
 	identifiers = append(identifiers, identifier)
-
 	for p.peekTokenIs(token.COMMA) {
 		p.nextToken()
 		p.nextToken()
 		identifier := &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal}
 		identifiers = append(identifiers, identifier)
 	}
-
 	if !p.expectPeek(token.RIGHT_PARENTHESIS) {
 		return nil
 	}
-
 	return identifiers
 }
 
