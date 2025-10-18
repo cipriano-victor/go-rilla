@@ -9,12 +9,13 @@ import (
 )
 
 type Lexer struct {
-	input       string
-	offset      int             // posición actual en input (apunta al carácter actual)
-	readOffset  int             // posición de lectura (apunta al siguiente carácter a leer)
-	character   rune            // carácter actual bajo revisión
-	position    source.Position // posición del carácter actual (línea y columna)
-	diagnostics []diag.Diagnostic
+	input             string
+	offset            int             // posición actual en input (apunta al carácter actual)
+	readOffset        int             // posición de lectura (apunta al siguiente carácter a leer)
+	character         rune            // carácter actual bajo revisión
+	position          source.Position // posición del carácter actual (línea y columna)
+	diagnostics       []diag.Diagnostic
+	lastDecodeInvalid bool
 }
 
 // Diagnostics devuelve los diagnósticos léxicos acumulados.
@@ -61,9 +62,16 @@ func (l *Lexer) readCharacter() {
 		}
 	}
 
-	l.offset = l.readOffset
 	r, w := utf8.DecodeRuneInString(l.input[l.readOffset:])
 	l.character = r
+
+	if r == utf8.RuneError && w == 1 {
+		l.lastDecodeInvalid = true
+	} else {
+		l.lastDecodeInvalid = false
+	}
+
+	l.offset = l.readOffset
 	l.readOffset += w
 }
 
@@ -147,14 +155,14 @@ func (l *Lexer) NextToken() token.Token {
 		return tok
 	case '"':
 		s, closed := l.readString()
-		end := l.currentStart() // si cerró, es la comilla de cierre; si no, es EOF
+		end := l.currentStart()
 		if !closed {
-			l.addDiag(diag.Error, "LEX003", "String without closing quote", "Closing quote '\"' is missing", start, end)
-			// no consumimos comilla porque no la hay; solo devolvemos ILLEGAL
+			l.addDiag(diag.Error, "LEX003", "String without closing quote", "Missing closing quote '\"'", start, end)
 			return token.Token{Type: token.ILLEGAL, Literal: s, Range: source.Range{Start: start, End: end}}
 		}
-		l.readCharacter() // consumir la comilla de cierre
+		l.readCharacter() // consumir comilla de cierre
 		return token.Token{Type: token.STRING, Literal: s, Range: source.Range{Start: start, End: end}}
+
 	case 0:
 		return token.Token{Type: token.EOF, Literal: "", Range: source.Range{Start: start, End: start}}
 	default:
@@ -180,7 +188,16 @@ func (l *Lexer) NextToken() token.Token {
 			}
 			return token.Token{Type: token.INTEGER, Literal: intPart, Range: source.Range{Start: start, End: l.currentStart()}}
 		}
-		tok = newToken(token.ILLEGAL, l.character, start, l.afterCurrent())
+		if l.lastDecodeInvalid {
+			end := l.afterCurrent()
+			tok := token.Token{Type: token.ILLEGAL, Literal: string(l.character), Range: source.Range{Start: start, End: end}}
+			l.addDiag(diag.Error, "LEX005", "Invalid UTF-8 byte", "carácter no decodificable", start, end)
+			l.readCharacter()
+			return tok
+		}
+
+		end := l.afterCurrent()
+		tok := newToken(token.ILLEGAL, l.character, start, end)
 		l.addDiag(diag.Error, "LEX001", "Illegal Character", "Character not recognized by the language", start, l.afterCurrent())
 		l.readCharacter()
 		return tok
@@ -206,18 +223,28 @@ func (l *Lexer) read(isValid func(rune) bool) string {
 }
 
 func (l *Lexer) readString() (string, bool) {
-	l.readCharacter() // consumir comilla de apertura y posicionarnos en el primer carácter del contenido
-	start := l.offset
+	l.readCharacter() // consumir la comilla de apertura
+	startContent := l.offset
 	for l.character != '"' && l.character != 0 {
-		// (nota) escape básico: \" — queda como TODO el resto
-		if l.character == '\\' && l.peekCharacter() == '"' {
-			l.readCharacter()
+		if l.character == '\\' {
+			escStart := l.currentStart()
+			next := l.peekCharacter()
+			switch next {
+			case '"', '\\', 'n', 't', 'r':
+				l.readCharacter()
+			default:
+				escEnd := l.afterCurrent()
+				l.addDiag(diag.Error, "LEX004", "Invalid escape sequence",
+					"Use \\\" \\\\ \\n \\t or \\r", escStart, escEnd)
+				if next != 0 {
+					l.readCharacter()
+				}
+			}
 		}
 		l.readCharacter()
 	}
-
 	closed := (l.character == '"')
-	return l.input[start:l.offset], closed
+	return l.input[startContent:l.offset], closed
 }
 
 func (l *Lexer) currentStart() source.Position {
