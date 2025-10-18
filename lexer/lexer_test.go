@@ -3,6 +3,7 @@ package lexer
 import (
 	"go-rilla/token"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestNextToken(t *testing.T) {
@@ -191,4 +192,152 @@ let bigger_int_part = 314.15;
 				i, tt.expectedLiteral, tok.Literal)
 		}
 	}
+}
+
+func TestStringEmptyNoDiag(t *testing.T) {
+	l := New("\"\"")
+	tok := l.NextToken()
+	if tok.Type != token.STRING {
+		t.Fatalf("expected STRING, got %s", tok.Type)
+	}
+	if ds := l.Diagnostics(); len(ds) != 0 {
+		t.Fatalf("expected 0 diagnostics, got %d: %#v", len(ds), ds)
+	}
+}
+
+func TestStringWithEscapedQuoteNoDiag(t *testing.T) {
+	l := New("\"foo\\\"bar\"")
+	tok := l.NextToken()
+	if tok.Type != token.STRING {
+		t.Fatalf("expected STRING, got %s", tok.Type)
+	}
+	if tok.Literal != "foo\\\"bar" {
+		t.Fatalf("unexpected literal: %q", tok.Literal)
+	}
+	if ds := l.Diagnostics(); len(ds) != 0 {
+		t.Fatalf("expected 0 diagnostics, got %d: %#v", len(ds), ds)
+	}
+}
+
+func TestMalformedFloat(t *testing.T) {
+	l := New("3.")
+	tok := l.NextToken()
+	if tok.Type != token.ILLEGAL {
+		t.Fatalf("expected ILLEGAL, got %s", tok.Type)
+	}
+	ds := l.Diagnostics()
+	if len(ds) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if ds[0].Code != "LEX002" {
+		t.Fatalf("expected LEX002, got %s", ds[0].Code)
+	}
+}
+
+func TestUnterminatedString(t *testing.T) {
+	l := New("\"foo")
+	tok := l.NextToken()
+	if tok.Type != token.ILLEGAL {
+		t.Fatalf("expected ILLEGAL, got %s", tok.Type)
+	}
+	ds := l.Diagnostics()
+	if len(ds) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if ds[0].Code != "LEX003" {
+		t.Fatalf("expected LEX003, got %s", ds[0].Code)
+	}
+}
+
+func TestIllegalChar(t *testing.T) {
+	l := New("¿")
+	tok := l.NextToken()
+	if tok.Type != token.ILLEGAL {
+		t.Fatalf("expected ILLEGAL, got %s", tok.Type)
+	}
+	ds := l.Diagnostics()
+	if len(ds) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if ds[0].Code != "LEX001" {
+		t.Fatalf("expected LEX001, got %s", ds[0].Code)
+	}
+}
+
+func TestInvalidEscape(t *testing.T) {
+	l := New("\"foo\\z\"")
+	tok := l.NextToken()
+	if tok.Type != token.STRING {
+		t.Fatalf("expected STRING, got %s", tok.Type)
+	}
+	ds := l.Diagnostics()
+	if len(ds) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	found := false
+	for _, d := range ds {
+		if d.Code == "LEX004" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected LEX004, got: %#v", ds)
+	}
+}
+
+func TestInvalidUTF8(t *testing.T) {
+	input := string([]byte{0xff})
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != token.ILLEGAL {
+		t.Fatalf("expected ILLEGAL, got %s", tok.Type)
+	}
+	ds := l.Diagnostics()
+	if len(ds) == 0 {
+		t.Fatalf("expected diagnostics, got none")
+	}
+	if ds[0].Code != "LEX005" {
+		t.Fatalf("expected LEX005, got %s", ds[0].Code)
+	}
+}
+
+func FuzzLexerNeverPanicsAndRangesAreMonotonic(f *testing.F) {
+	seeds := []string{
+		``, `a`, `3.`, `"x`, `"foo\"bar"`, "¿",
+		"let x = 1;", `import "math" m;`, "!;",
+		string([]byte{0xff}),
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+
+	f.Fuzz(func(t *testing.T, s string) {
+		_ = utf8.ValidString(s)
+
+		l := New(s)
+
+		const maxSteps = 10000
+		prevOff := -1
+		for i := 0; i < maxSteps; i++ {
+			tok := l.NextToken()
+			if tok.Range.Start.Offset < prevOff {
+				t.Fatalf("token range offset went backwards: prev=%d, now=%d (tok=%+v)", prevOff, tok.Range.Start.Offset, tok)
+			}
+			prevOff = tok.Range.Start.Offset
+
+			if tok.Type == token.EOF {
+				break
+			}
+		}
+
+		for _, d := range l.Diagnostics() {
+			if d.Range.End.Offset <= d.Range.Start.Offset {
+				t.Fatalf("diag with invalid offsets: %+v (input=%q)", d.Range, s)
+			}
+			if d.Range.Start.Line < 1 || d.Range.Start.Column < 1 ||
+				d.Range.End.Line < 1 || d.Range.End.Column < 1 {
+				t.Fatalf("diag with invalid line/col: %+v (input=%q)", d.Range, s)
+			}
+		}
+	})
 }
