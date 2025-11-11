@@ -34,7 +34,7 @@ func main() {
 
 	fmt.Printf("Welcome to Go-Rilla, %s! \n", currentUser.Username)
 	fmt.Printf("Feel free to write any kind of commands \n")
-	fmt.Printf("Press Ctrl+C or type 'exit' to leave \n")
+	fmt.Printf("Press Ctrl+C/D or type 'exit' to leave \n")
 	switch selectedMode {
 	case repl.ModeScanner:
 		repl.StartScanner(os.Stdin, os.Stdout)
