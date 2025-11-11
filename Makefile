@@ -4,11 +4,6 @@
 test:
 	go test ./...
 
-
-race:
-	go test -race ./...
-
-
 fmt:
 	gofumpt -w . || gofmt -w .
 

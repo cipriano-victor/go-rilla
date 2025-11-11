@@ -7,6 +7,7 @@ import (
 	"go-rilla/evaluator"
 	"go-rilla/internal/diagprint"
 	"go-rilla/lexer"
+	"go-rilla/object"
 	"go-rilla/parser"
 	"go-rilla/token"
 	"io"
@@ -42,6 +43,10 @@ func StartScanner(in io.Reader, out io.Writer)   { startRepl(ModeScanner, in, ou
 
 func startRepl(mode Mode, in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
+	var env *object.Environment
+	if mode == ModeEvaluator {
+		env = object.NewEnvironment()
+	}
 	for {
 		fmt.Print(PROMPT)
 
@@ -55,19 +60,28 @@ func startRepl(mode Mode, in io.Reader, out io.Writer) {
 			return
 		}
 
-		processLine(mode, line, out)
+		env = processLine(mode, line, out, env)
 	}
 }
 
-func processLine(mode Mode, line string, out io.Writer) {
+func processLine(mode Mode, line string, out io.Writer, env *object.Environment) *object.Environment {
 	switch mode {
 	case ModeScanner:
 		runScanner(line, out)
 	case ModeParser:
 		runParser(line, out)
+	case ModeEvaluator:
+		if env == nil {
+			env = object.NewEnvironment()
+		}
+		runEvaluator(line, out, env)
 	default:
-		runEvaluator(line, out)
+		if env == nil {
+			env = object.NewEnvironment()
+		}
+		runEvaluator(line, out, env)
 	}
+	return env
 }
 
 func startParser(line string, out io.Writer) (*lexer.Lexer, *parser.Parser, *ast.Program) {
@@ -84,13 +98,13 @@ func startParser(line string, out io.Writer) (*lexer.Lexer, *parser.Parser, *ast
 	return l, p, program
 }
 
-func runEvaluator(line string, out io.Writer) {
+func runEvaluator(line string, out io.Writer, env *object.Environment) {
 	l, p, program := startParser(line, out)
 	if l == nil || p == nil || program == nil {
 		return
 	}
 
-	evaluated := evaluator.Eval(program)
+	evaluated := evaluator.Eval(program, env)
 	if evaluated != nil {
 		io.WriteString(out, evaluated.Inspect())
 		io.WriteString(out, "\n")
