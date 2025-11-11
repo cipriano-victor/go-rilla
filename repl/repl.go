@@ -3,6 +3,8 @@ package repl
 import (
 	"bufio"
 	"fmt"
+	"go-rilla/ast"
+	"go-rilla/evaluator"
 	"go-rilla/internal/diagprint"
 	"go-rilla/lexer"
 	"go-rilla/parser"
@@ -13,8 +15,9 @@ import (
 type Mode string
 
 const (
-	ModeParser  Mode = "parser"
-	ModeScanner Mode = "scanner"
+	ModeEvaluator Mode = "evaluator"
+	ModeParser    Mode = "parser"
+	ModeScanner   Mode = "scanner"
 )
 
 const PROMPT = ">> "
@@ -32,17 +35,10 @@ const GORILLA_FACE = `
 		 
 `
 
-func Start(in io.Reader, out io.Writer) {
-	StartParser(in, out)
-}
-
-func StartParser(in io.Reader, out io.Writer) {
-	startRepl(ModeParser, in, out)
-}
-
-func StartScanner(in io.Reader, out io.Writer) {
-	startRepl(ModeScanner, in, out)
-}
+func Start(in io.Reader, out io.Writer)          { StartEvaluator(in, out) }
+func StartEvaluator(in io.Reader, out io.Writer) { startRepl(ModeEvaluator, in, out) }
+func StartParser(in io.Reader, out io.Writer)    { startRepl(ModeParser, in, out) }
+func StartScanner(in io.Reader, out io.Writer)   { startRepl(ModeScanner, in, out) }
 
 func startRepl(mode Mode, in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
@@ -67,36 +63,53 @@ func processLine(mode Mode, line string, out io.Writer) {
 	switch mode {
 	case ModeScanner:
 		runScanner(line, out)
-	default:
+	case ModeParser:
 		runParser(line, out)
+	default:
+		runEvaluator(line, out)
 	}
 }
 
-func runParser(line string, out io.Writer) {
+func startParser(line string, out io.Writer) (*lexer.Lexer, *parser.Parser, *ast.Program) {
 	l := lexer.New(line)
 	p := parser.New(l)
 	program := p.ParseProgram()
 
 	if len(p.Errors()) != 0 {
 		printParserErrors(out, p.Errors())
-		if ds := l.Diagnostics(); len(ds) > 0 {
-			io.WriteString(out, diagprint.RenderPlain("<repl>", line, ds))
-		}
-		if pds := p.Diagnostics(); len(pds) > 0 {
-			io.WriteString(out, diagprint.RenderPlain("<repl>", line, pds))
-		}
+		writeDiagnostics(l, p, line, out)
+		return nil, nil, nil
+	}
+
+	return l, p, program
+}
+
+func runEvaluator(line string, out io.Writer) {
+	l, p, program := startParser(line, out)
+	if l == nil || p == nil || program == nil {
 		return
 	}
+
+	evaluated := evaluator.Eval(program)
+	if evaluated != nil {
+		io.WriteString(out, evaluated.Inspect())
+		io.WriteString(out, "\n")
+	}
+
+	writeDiagnostics(l, p, line, out)
+}
+
+func runParser(line string, out io.Writer) {
+	l, p, program := startParser(line, out)
+	if l == nil || p == nil || program == nil {
+		return
+	}
+
 	io.WriteString(out, program.String())
 	io.WriteString(out, "\n")
 
 	// Util para warnings aún con el parseo correcto
-	if ds := l.Diagnostics(); len(ds) > 0 {
-		io.WriteString(out, diagprint.RenderPlain("<repl>", line, ds))
-	}
-	if pds := p.Diagnostics(); len(pds) > 0 {
-		io.WriteString(out, diagprint.RenderPlain("<repl>", line, pds))
-	}
+	writeDiagnostics(l, p, line, out)
 }
 
 func runScanner(line string, out io.Writer) {
@@ -120,5 +133,14 @@ func printParserErrors(out io.Writer, errors []string) {
 	io.WriteString(out, " parser errors:\n")
 	for _, msg := range errors {
 		io.WriteString(out, "\t"+msg+"\n")
+	}
+}
+
+func writeDiagnostics(l *lexer.Lexer, p *parser.Parser, source string, out io.Writer) {
+	if ds := l.Diagnostics(); len(ds) > 0 {
+		io.WriteString(out, diagprint.RenderPlain("<repl>", source, ds))
+	}
+	if pds := p.Diagnostics(); len(pds) > 0 {
+		io.WriteString(out, diagprint.RenderPlain("<repl>", source, pds))
 	}
 }
