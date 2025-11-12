@@ -30,17 +30,17 @@ if (a && b || c) {}
 five += 1;
 ten -= 1;
 
-"foo bar"
-[1, 2]
 {"key": "value"}
-
 
 m.sqrt(9) != 4
 let decimal = 3.1415;
 let bigger_int_part = 314.15;
 3..1
+
 "foobar"
 "foo bar"
+
+[1, 2];
 `
 
 	tests := []struct {
@@ -139,13 +139,6 @@ let bigger_int_part = 314.15;
 		{token.INTEGER, "1"},
 		{token.SEMICOLON, ";"},
 
-		{token.STRING, "foo bar"},
-		{token.LEFT_BRACKET, "["},
-		{token.INTEGER, "1"},
-		{token.COMMA, ","},
-		{token.INTEGER, "2"},
-		{token.RIGHT_BRACKET, "]"},
-
 		{token.LEFT_BRACE, "{"},
 		{token.STRING, "key"},
 		{token.COLON, ":"},
@@ -179,6 +172,14 @@ let bigger_int_part = 314.15;
 
 		{token.STRING, "foobar"},
 		{token.STRING, "foo bar"},
+
+		{token.LEFT_BRACKET, "["},
+		{token.INTEGER, "1"},
+		{token.COMMA, ","},
+		{token.INTEGER, "2"},
+		{token.RIGHT_BRACKET, "]"},
+		{token.SEMICOLON, ";"},
+
 		{token.EOF, ""},
 	}
 
