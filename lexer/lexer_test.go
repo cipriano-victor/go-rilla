@@ -39,6 +39,8 @@ m.sqrt(9) != 4
 let decimal = 3.1415;
 let bigger_int_part = 314.15;
 3..1
+"foobar"
+"foo bar"
 `
 
 	tests := []struct {
@@ -174,6 +176,9 @@ let bigger_int_part = 314.15;
 		{token.ILLEGAL, "3."},
 		{token.DOT, "."},
 		{token.INTEGER, "1"},
+
+		{token.STRING, "foobar"},
+		{token.STRING, "foo bar"},
 		{token.EOF, ""},
 	}
 
