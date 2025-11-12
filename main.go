@@ -40,6 +40,8 @@ func main() {
 		repl.StartScanner(os.Stdin, os.Stdout)
 	case repl.ModeParser:
 		repl.StartParser(os.Stdin, os.Stdout)
+	case repl.ModeEvaluator:
+		repl.StartEvaluator(os.Stdin, os.Stdout)
 	default:
 		repl.StartEvaluator(os.Stdin, os.Stdout)
 	}

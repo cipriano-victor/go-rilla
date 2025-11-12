@@ -36,7 +36,6 @@ const GORILLA_FACE = `
 		 
 `
 
-func Start(in io.Reader, out io.Writer)          { StartEvaluator(in, out) }
 func StartEvaluator(in io.Reader, out io.Writer) { startRepl(ModeEvaluator, in, out) }
 func StartParser(in io.Reader, out io.Writer)    { startRepl(ModeParser, in, out) }
 func StartScanner(in io.Reader, out io.Writer)   { startRepl(ModeScanner, in, out) }
@@ -71,20 +70,14 @@ func processLine(mode Mode, line string, out io.Writer, env *object.Environment)
 	case ModeParser:
 		runParser(line, out)
 	case ModeEvaluator:
-		if env == nil {
-			env = object.NewEnvironment()
-		}
 		runEvaluator(line, out, env)
 	default:
-		if env == nil {
-			env = object.NewEnvironment()
-		}
 		runEvaluator(line, out, env)
 	}
 	return env
 }
 
-func startParser(line string, out io.Writer) (*lexer.Lexer, *parser.Parser, *ast.Program) {
+func StartProgram(line string, out io.Writer) (*lexer.Lexer, *parser.Parser, *ast.Program) {
 	l := lexer.New(line)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -99,7 +92,7 @@ func startParser(line string, out io.Writer) (*lexer.Lexer, *parser.Parser, *ast
 }
 
 func runEvaluator(line string, out io.Writer, env *object.Environment) {
-	l, p, program := startParser(line, out)
+	l, p, program := StartProgram(line, out)
 	if l == nil || p == nil || program == nil {
 		return
 	}
@@ -114,7 +107,7 @@ func runEvaluator(line string, out io.Writer, env *object.Environment) {
 }
 
 func runParser(line string, out io.Writer) {
-	l, p, program := startParser(line, out)
+	l, p, program := StartProgram(line, out)
 	if l == nil || p == nil || program == nil {
 		return
 	}
