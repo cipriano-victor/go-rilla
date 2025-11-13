@@ -232,6 +232,22 @@ func TestErrorHandling(t *testing.T) {
 			`{"name": "Monkey"}[fn(x) { x }];`,
 			"unusable as hash key: FUNCTION",
 		},
+		{
+			`len(1);`,
+			"argument to `len` not supported, got INTEGER",
+		},
+		{
+			`len("one", "two");`,
+			"wrong number of arguments. got=2, want=1",
+		},
+		{
+			`5 += true;`,
+			"type mismatch: INTEGER += BOOLEAN",
+		},
+		{
+			`"Hello" -= "o";`,
+			"unknown operator: STRING -= STRING",
+		},
 	}
 
 	for _, tt := range tests {
@@ -556,12 +572,26 @@ func TestOrOperator(t *testing.T) {
 func TestCompoundOperators(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected int64
+		expected interface{}
 	}{
 		{"let a = 5; a += 3; a;", 8},
 		{"let a = 10; a -= 4; a;", 6},
+		{"let a = \"Hola\"; a += \" Mundo\"; a;", "Hola Mundo"},
 	}
 	for _, tt := range tests {
-		testIntegerObject(t, testEval(tt.input), tt.expected)
+		evaluated := testEval(tt.input)
+		switch expected := tt.expected.(type) {
+		case int:
+			testIntegerObject(t, evaluated, int64(expected))
+		case string:
+			str, ok := evaluated.(*object.String)
+			if !ok {
+				t.Errorf("object is not String. got=%T (%+v)", evaluated, evaluated)
+				continue
+			}
+			if str.Value != expected {
+				t.Errorf("String has wrong value. got=%q, want=%q", str.Value, expected)
+			}
+		}
 	}
 }
