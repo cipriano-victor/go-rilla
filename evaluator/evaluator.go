@@ -44,6 +44,9 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 		return evalPrefixExpression(node.Operator, right)
 	case *ast.InfixExpression:
+		if isCompoundAssignment(node.TokenLiteral()) {
+			return evalCompoundAssignment(node, env)
+		}
 		left := Eval(node.Left, env)
 		if isError(left) {
 			return left
@@ -171,6 +174,35 @@ func evalInfixExpression(operator string, left, right object.Object) object.Obje
 	}
 }
 
+func isCompoundAssignment(tokenLiteral string) bool {
+	return tokenLiteral == "+=" || tokenLiteral == "-="
+}
+
+func evalCompoundAssignment(node *ast.InfixExpression, env *object.Environment) object.Object {
+	identifier, ok := node.Left.(*ast.Identifier)
+	if !ok {
+		return newError("invalid assignment target: %s", node.Left.TokenLiteral())
+	}
+
+	current := Eval(node.Left, env)
+	if isError(current) {
+		return current
+	}
+
+	right := Eval(node.Right, env)
+	if isError(right) {
+		return right
+	}
+
+	result := evalInfixExpression(node.Operator, current, right)
+	if isError(result) {
+		return result
+	}
+
+	env.Set(identifier.Value, result)
+	return result
+}
+
 func evalIntegerInfixExpression(operator string, left, right object.Object) object.Object {
 	leftVal := left.(*object.Integer).Value
 	rightVal := right.(*object.Integer).Value
@@ -192,6 +224,10 @@ func evalIntegerInfixExpression(operator string, left, right object.Object) obje
 		return nativeBoolToBooleanObject(leftVal == rightVal)
 	case "!=":
 		return nativeBoolToBooleanObject(leftVal != rightVal)
+	case "<=":
+		return nativeBoolToBooleanObject(leftVal <= rightVal)
+	case ">=":
+		return nativeBoolToBooleanObject(leftVal >= rightVal)
 	default:
 		return newError("unknown operator: %s %s %s",
 			left.Type(), operator, right.Type())

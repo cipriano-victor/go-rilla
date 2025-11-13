@@ -80,6 +80,12 @@ func TestEvalBooleanExpression(t *testing.T) {
 		{"(1 < 2) == false", false},
 		{"(1 > 2) == true", false},
 		{"(1 > 2) == false", true},
+		{"2 >= 1", true},
+		{"1 >= 1", true},
+		{"1 >= 2", false},
+		{"1 <= 2", true},
+		{"1 <= 1", true},
+		{"2 <= 1", false},
 	}
 	for _, tt := range tests {
 		evaluated := testEval(tt.input)
@@ -544,5 +550,18 @@ func TestOrOperator(t *testing.T) {
 	for _, tt := range tests {
 		evaluated := testEval(tt.input)
 		testBooleanObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestCompoundOperators(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"let a = 5; a += 3; a;", 8},
+		{"let a = 10; a -= 4; a;", 6},
+	}
+	for _, tt := range tests {
+		testIntegerObject(t, testEval(tt.input), tt.expected)
 	}
 }
