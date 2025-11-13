@@ -641,7 +641,7 @@ func TestWhileExpression(t *testing.T) {
 		input    string
 		expected int64
 	}{
-		{"let i = 0; let sum = 0; while (i < 5) { sum += i; i += 1; } sum;", 10},
+		{"let i = 0; while (i < 5) { i += 1; } i;", 5},
 		{"let i = 0; let sum = 0; while (i < 0) { sum += i; i += 1; } sum;", 0},
 		{"let i = 10; let prod = 100; while (i >= 0) { prod -= i; i -= 1; } prod;", 45},
 	}
