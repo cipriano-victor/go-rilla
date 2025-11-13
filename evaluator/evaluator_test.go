@@ -595,3 +595,43 @@ func TestCompoundOperators(t *testing.T) {
 		}
 	}
 }
+
+func TestEvalFloatExpression(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected float64
+	}{
+		{"5.5", 5.5},
+		{"10.0", 10.0},
+		{"-5.5", -5.5},
+		{"-10.0", -10.0},
+		{"5.5 + 4.5", 10.0},
+		{"2.0 * 2.5", 5.0},
+		{"10.0 / 4.0", 2.5},
+		{"2.0 * (5.0 + 5.0)", 20.0},
+		{"(5.0 + 10.0 * 2.0 + 15.0 / 3.0) * 2.0 + -10.0", 50.0},
+		{"(5 + 10.0) * 2", 30.0},
+		{"5.5 * 2 + 10.0", 21.0},
+		{"5 - 2.5 * 10", -20.0},
+		{"let a = 5.5; a += 4.5; a;", 10.0},
+		{"let a = 10.0; a -= 4.0; a;", 6.0},
+	}
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testFloatObject(t, evaluated, tt.expected)
+	}
+}
+
+func testFloatObject(t *testing.T, obj object.Object, expected float64) bool {
+	result, ok := obj.(*object.Float)
+	if !ok {
+		t.Errorf("object is not Float. got=%T (%+v)", obj, obj)
+		return false
+	}
+	if result.Value != expected {
+		t.Errorf("object has wrong value. got=%f, want=%f",
+			result.Value, expected)
+		return false
+	}
+	return true
+}
