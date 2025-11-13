@@ -185,7 +185,8 @@ func (l *Lexer) NextToken() token.Token {
 				l.addDiag(diag.Error, "LEX002", "Malformed float literal", "At least one digit is expected after the decimal point", start, end)
 				l.readCharacter()
 				return token.Token{Type: token.ILLEGAL, Literal: literal, Range: source.Range{Start: start, End: end}}
-			} else if !isDigit(l.character) {
+			}
+			if isLetter(l.character) {
 				l.addDiag(diag.Error, "LEX006", "Malformed number literal", "Unexpected character after number", start, l.currentStart())
 				return token.Token{Type: token.ILLEGAL, Literal: intPart, Range: source.Range{Start: start, End: l.currentStart()}}
 			}
