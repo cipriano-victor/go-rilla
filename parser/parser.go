@@ -99,8 +99,6 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseLetStatement()
 	case token.RETURN:
 		return p.parseReturnStatement()
-	case token.IMPORT:
-		return p.parseImportStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -117,35 +115,6 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	}
 	p.nextToken()
 	stmt.Value = p.parseExpression(LOWEST)
-	if p.peekTokenIs(token.SEMICOLON) {
-		p.nextToken()
-	}
-	return stmt
-}
-
-func (p *Parser) parseImportStatement() *ast.ImportStatement {
-	stmt := &ast.ImportStatement{Token: p.currentToken}
-	if !p.expectPeek(token.STRING) {
-		return nil
-	}
-	stmt.Path = &ast.StringLiteral{Token: p.currentToken, Value: p.currentToken.Literal}
-
-	if !p.expectPeek(token.AS) {
-		msg := "Expected 'as' after import path"
-		p.errors = append(p.errors, msg)
-		p.addDiag(diag.Diagnostic{
-			Level:   diag.Error,
-			Code:    "IMP001",
-			Message: msg,
-			Hint:    "The correct form is: import \"ruta\" as alias;",
-			Range:   p.peekToken.Range,
-		})
-		return nil
-	}
-	if !p.expectPeek(token.IDENTIFIER) {
-		return nil
-	}
-	stmt.Alias = &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal}
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}

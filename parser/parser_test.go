@@ -5,7 +5,6 @@ import (
 	"go-rilla/ast"
 	"go-rilla/lexer"
 	"testing"
-	"unicode/utf8"
 )
 
 func testLetStatement(t *testing.T, s ast.Statement, name string) bool {
@@ -864,56 +863,6 @@ func TestStringLiteralExpression(t *testing.T) {
 	}
 }
 
-func TestImportAsStatement(t *testing.T) {
-	input := `import "math" as m;`
-	l := lexer.New(input)
-	p := New(l)
-	program := p.ParseProgram()
-	checkParserErrors(t, p)
-	if len(program.Statements) != 1 {
-		t.Fatalf("program.Statements expected 1, got=%d", len(program.Statements))
-	}
-	stmt, ok := program.Statements[0].(*ast.ImportStatement)
-	if !ok {
-		t.Fatalf("stmt not *ast.ImportStatement. got=%T", program.Statements[0])
-	}
-	if stmt.Path.Value != "math" {
-		t.Fatalf("path != math, got %q", stmt.Path.Value)
-	}
-	if stmt.Alias.Value != "m" {
-		t.Fatalf("alias != m, got %q", stmt.Alias.Value)
-	}
-}
-
-func TestMemberAccessAndCall(t *testing.T) {
-	input := `m.sqrt(9);`
-	l := lexer.New(input)
-	p := New(l)
-	program := p.ParseProgram()
-	checkParserErrors(t, p)
-	stmt := program.Statements[0].(*ast.ExpressionStatement)
-	call, ok := stmt.Expression.(*ast.CallExpression)
-	if !ok {
-		t.Fatalf("expr not *ast.CallExpression. got=%T", stmt.Expression)
-	}
-	member, ok := call.Function.(*ast.MemberExpression)
-	if !ok {
-		t.Fatalf("function not *ast.MemberExpression. got=%T", call.Function)
-	}
-	if ident, ok := member.Object.(*ast.Identifier); !ok || ident.Value != "m" {
-		t.Fatalf("object not identifier m. got=%T %v", member.Object, member.Object)
-	}
-	if member.Property.Value != "sqrt" {
-		t.Fatalf("property != sqrt, got %q", member.Property.Value)
-	}
-	if len(call.Arguments) != 1 {
-		t.Fatalf("args len != 1, got %d", len(call.Arguments))
-	}
-	if !testLiteralExpression(t, call.Arguments[0], 9) {
-		return
-	}
-}
-
 func TestNoPrefixFn(t *testing.T) {
 	input := "!;"
 	l := lexer.New(input)
@@ -938,27 +887,6 @@ func TestNoPrefixFn(t *testing.T) {
 	}
 }
 
-func TestImportMissingAs(t *testing.T) {
-	input := "import \"math\" m;"
-	l := lexer.New(input)
-	p := New(l)
-	_ = p.ParseProgram()
-
-	diags := p.Diagnostics()
-	if len(diags) == 0 {
-		t.Fatalf("expected diagnostics, got none")
-	}
-	found := false
-	for _, d := range diags {
-		if d.Code == "IMP001" {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("expected IMP001 diagnostic, got: %#v", diags)
-	}
-}
-
 func TestIntegerOverflow(t *testing.T) {
 	input := "9999999999999999999999999999999999;"
 	l := lexer.New(input)
@@ -978,69 +906,6 @@ func TestIntegerOverflow(t *testing.T) {
 	if !found {
 		t.Fatalf("expected LIT001 diagnostic, got: %#v", diags)
 	}
-}
-
-func TestDiagnostics_RangeInvariants(t *testing.T) {
-	cases := []string{
-		"!;",
-		`import "math" m;`,
-		`9999999999999999999999999999999999;`,
-	}
-
-	for i, input := range cases {
-		l := lexer.New(input)
-		p := New(l)
-		_ = p.ParseProgram()
-		diags := p.Diagnostics()
-
-		if len(diags) == 0 {
-			t.Fatalf("case[%d]: expected diagnostics, got none", i)
-		}
-		for _, d := range diags {
-			// Rango no vacío: End > Start (en Offset o en Line/Column)
-			if d.Range.End.Offset <= d.Range.Start.Offset {
-				t.Fatalf("case[%d]: invalid offsets: %+v", i, d.Range)
-			}
-			// Líneas y columnas válidas (1-based)
-			if d.Range.Start.Line < 1 || d.Range.Start.Column < 1 ||
-				d.Range.End.Line < 1 || d.Range.End.Column < 1 {
-				t.Fatalf("case[%d]: invalid line/column: %+v", i, d.Range)
-			}
-			// Si error está en una sola línea, columna End >= Start
-			if d.Range.Start.Line == d.Range.End.Line && d.Range.End.Column < d.Range.Start.Column {
-				t.Fatalf("case[%d]: invalid single-line columns: %+v", i, d.Range)
-			}
-		}
-	}
-}
-
-func FuzzParserNeverPanicsAndRangesAreValid(f *testing.F) {
-	seeds := []string{
-		``, `a`, `3.`, `"x`, `"foo\"bar"`, "¿",
-		"let x = 1;", `import "math" m;`, "!;",
-		string([]byte{0xff}),
-	}
-	for _, s := range seeds {
-		f.Add(s)
-	}
-
-	f.Fuzz(func(t *testing.T, s string) {
-		_ = utf8.ValidString(s)
-
-		l := lexer.New(s)
-		p := New(l)
-		_ = p.ParseProgram()
-
-		for _, d := range p.Diagnostics() {
-			if d.Range.End.Offset <= d.Range.Start.Offset {
-				t.Fatalf("parser diag invalid offsets: %+v (input=%q)", d.Range, s)
-			}
-			if d.Range.Start.Line < 1 || d.Range.Start.Column < 1 ||
-				d.Range.End.Line < 1 || d.Range.End.Column < 1 {
-				t.Fatalf("parser diag invalid line/col: %+v (input=%q)", d.Range, s)
-			}
-		}
-	})
 }
 
 func TestParsingArrayLiterals(t *testing.T) {

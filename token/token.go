@@ -44,7 +44,7 @@ const (
 	COMMA     = ","
 	SEMICOLON = ";"
 	COLON     = ":"
-	DOT       = "." // para acceso a miembros
+	DOT       = "."
 
 	LEFT_PARENTHESIS  = "("
 	RIGHT_PARENTHESIS = ")"
@@ -63,10 +63,6 @@ const (
 	FALSE = "FALSE"
 	IF    = "IF"
 	ELSE  = "ELSE"
-
-	// Keywords para módulos y paquetes
-	IMPORT = "IMPORT"
-	AS     = "AS"
 )
 
 var keywords = map[string]TokenType{
@@ -77,8 +73,6 @@ var keywords = map[string]TokenType{
 	"false":  FALSE,
 	"if":     IF,
 	"else":   ELSE,
-	"import": IMPORT,
-	"as":     AS,
 }
 
 func LookupIdentifier(identifier string) TokenType {

@@ -7,9 +7,7 @@ import (
 )
 
 func TestNextToken(t *testing.T) {
-	input := `import "math" as m;
-
-!-/*>=<=¿==
+	input := `!-/*>=<=¿==
 
 let five = 5;
 let ten = 10;
@@ -47,12 +45,6 @@ let bigger_int_part = 314.15;
 		expectedType    token.TokenType
 		expectedLiteral string
 	}{
-		{token.IMPORT, "import"},
-		{token.STRING, "math"},
-		{token.AS, "as"},
-		{token.IDENTIFIER, "m"},
-		{token.SEMICOLON, ";"},
-
 		{token.BANG, "!"},
 		{token.MINUS, "-"},
 		{token.SLASH, "/"},
