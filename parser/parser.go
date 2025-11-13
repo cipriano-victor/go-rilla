@@ -43,6 +43,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.LEFT_BRACKET, p.parseArrayLiteral)
 	p.registerPrefix(token.LEFT_BRACE, p.parseHashLiteral)
 	p.registerPrefix(token.WHILE, p.parseWhileLoop)
+	p.registerPrefix(token.FOR, p.parseForLoop)
 
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
@@ -498,5 +499,57 @@ func (p *Parser) parseWhileLoop() ast.Expression {
 		return nil
 	}
 	expression.Body = p.parseBlockStatement()
+	return expression
+}
+
+func (p *Parser) parseForLoop() ast.Expression {
+	expression := &ast.WhileExpression{Token: p.currentToken}
+
+	if !p.expectPeek(token.LEFT_PARENTHESIS) {
+		return nil
+	}
+	p.nextToken()
+
+	// Init statement (optional)
+	if !p.currentTokenIs(token.SEMICOLON) {
+		expression.Init = p.parseStatement()
+		if !p.currentTokenIs(token.SEMICOLON) {
+			p.peekError(token.SEMICOLON)
+			return nil
+		}
+	}
+
+	// Move past ';'
+	p.nextToken()
+
+	// Condition expression
+	if !p.currentTokenIs(token.SEMICOLON) {
+		expression.Condition = p.parseExpression(LOWEST)
+		if !p.expectPeek(token.SEMICOLON) {
+			return nil
+		}
+	}
+
+	// Move past ';'
+	p.nextToken()
+
+	// Increment statement
+	var increment ast.Statement
+	if !p.currentTokenIs(token.RIGHT_PARENTHESIS) {
+		increment = p.parseStatement()
+		if !p.expectPeek(token.RIGHT_PARENTHESIS) {
+			return nil
+		}
+	}
+
+	expression.Post = increment
+
+	if !p.expectPeek(token.LEFT_BRACE) {
+		return nil
+	}
+
+	body := p.parseBlockStatement()
+	expression.Body = body
+
 	return expression
 }

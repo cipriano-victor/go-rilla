@@ -1129,3 +1129,59 @@ func TestWhileExpression(t *testing.T) {
 		return
 	}
 }
+
+func TestForLoop(t *testing.T) {
+	input := `for (i = 0; i < 10; i = i + 1) { doSomething(); }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements does not contain 1 statement. got=%d\n",
+			len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+			program.Statements[0])
+	}
+
+	forLoop, ok := stmt.Expression.(*ast.WhileExpression)
+	if !ok {
+		t.Fatalf("exp not *ast.WhileExpression. got=%T", stmt.Expression)
+	}
+
+	// Check that the condition is correct
+	if !testInfixExpression(t, forLoop.Condition, "i", "<", 10) {
+		return
+	}
+
+	// Check that the body is correct
+	if len(forLoop.Body.Statements) != 1 {
+		t.Errorf("body is not 1 statements. got=%d\n",
+			len(forLoop.Body.Statements))
+	}
+
+	body, ok := forLoop.Body.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("Statements[0] is not ast.ExpressionStatement. got=%T",
+			forLoop.Body.Statements[0])
+	}
+
+	callExp, ok := body.Expression.(*ast.CallExpression)
+	if !ok {
+		t.Fatalf("body expression is not ast.CallExpression. got=%T",
+			body.Expression)
+	}
+
+	if !testIdentifier(t, callExp.Function, "doSomething") {
+		return
+	}
+
+	if len(callExp.Arguments) != 0 {
+		t.Fatalf("expected 0 arguments, got=%d", len(callExp.Arguments))
+	}
+}

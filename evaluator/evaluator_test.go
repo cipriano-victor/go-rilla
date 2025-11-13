@@ -248,6 +248,10 @@ func TestErrorHandling(t *testing.T) {
 			`"Hello" -= "o";`,
 			"unknown operator: STRING -= STRING",
 		},
+		{
+			`while (i < 5) { i += 1; }`,
+			"identifier not found: i",
+		},
 	}
 
 	for _, tt := range tests {
@@ -645,6 +649,59 @@ func TestWhileExpression(t *testing.T) {
 		{"let i = 0; let sum = 0; while (i < 0) { sum += i; i += 1; } sum;", 0},
 		{"let i = 10; let prod = 100; while (i >= 0) { prod -= i; i -= 1; } prod;", 45},
 	}
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testIntegerObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestAssignmentExpression(t *testing.T) {
+	input := `
+		let i = 1;
+		i = i + 4;
+		i;
+	`
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 5)
+}
+
+func TestForLoopEvaluation(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{
+			input: `
+				let result = 0;
+				let i = "hola"; // Se ignora la inicialización de i
+				for (i = 0; i < 5; i = i + 1) {
+					result = result + i;
+				}
+				result;
+			`,
+			expected: 10,
+		},
+		{
+			input: `
+				let sum = 0;
+				for (let i = 0; i < 3; i += 1) {
+					sum += i;
+				}
+				sum;
+			`,
+			expected: 3,
+		},
+		{
+			input: `
+				let i = 0;
+				for (; i < 3; i += 1) {
+				}
+				i;
+			`,
+			expected: 3,
+		},
+	}
+
 	for _, tt := range tests {
 		evaluated := testEval(tt.input)
 		testIntegerObject(t, evaluated, tt.expected)

@@ -44,6 +44,9 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 		return evalPrefixExpression(node.Operator, right)
 	case *ast.InfixExpression:
+		if node.Operator == "=" {
+			return evalAssignmentExpression(node, env)
+		}
 		if isCompoundAssignment(node.TokenLiteral()) {
 			return evalCompoundAssignment(node, env)
 		}
@@ -99,22 +102,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	case *ast.HashLiteral:
 		return evalHashLiteral(node, env)
 	case *ast.WhileExpression:
-		condition := Eval(node.Condition, env)
-		if isError(condition) {
-			return condition
-		}
-		var result object.Object
-		for isTruthy(condition) {
-			result = Eval(node.Body, env)
-			if isError(result) {
-				return result
-			}
-			condition = Eval(node.Condition, env)
-			if isError(condition) {
-				return condition
-			}
-		}
-		return result
+		return evalWhileExpression(node, env)
 	}
 
 	return nil
@@ -327,6 +315,66 @@ func isTruthy(obj object.Object) bool {
 	default:
 		return true
 	}
+}
+
+func evalWhileExpression(node *ast.WhileExpression, env *object.Environment) object.Object {
+	if node.Init != nil {
+		result := Eval(node.Init, env)
+		if shouldHaltLoop(result) {
+			return result
+		}
+	}
+
+	var loopResult object.Object
+
+	for {
+		if node.Condition != nil {
+			condition := Eval(node.Condition, env)
+			if shouldHaltLoop(condition) {
+				return condition
+			}
+			if !isTruthy(condition) {
+				break
+			}
+		}
+
+		loopResult = Eval(node.Body, env)
+		if shouldHaltLoop(loopResult) {
+			return loopResult
+		}
+
+		if node.Post != nil {
+			postResult := Eval(node.Post, env)
+			if shouldHaltLoop(postResult) {
+				return postResult
+			}
+		}
+	}
+
+	return loopResult
+}
+
+func shouldHaltLoop(obj object.Object) bool {
+	if obj == nil {
+		return false
+	}
+	t := obj.Type()
+	return t == object.RETURN_VALUE_OBJ || t == object.ERROR_OBJ
+}
+
+func evalAssignmentExpression(node *ast.InfixExpression, env *object.Environment) object.Object {
+	identifier, ok := node.Left.(*ast.Identifier)
+	if !ok {
+		return newError("invalid assignment target: %s", node.Left.TokenLiteral())
+	}
+
+	value := Eval(node.Right, env)
+	if isError(value) {
+		return value
+	}
+
+	env.Set(identifier.Value, value)
+	return value
 }
 
 func evalProgram(program *ast.Program, env *object.Environment) object.Object {

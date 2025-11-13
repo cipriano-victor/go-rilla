@@ -347,7 +347,9 @@ func (hl *HashLiteral) String() string {
 
 type WhileExpression struct {
 	Token     token.Token
+	Init      Statement
 	Condition Expression
+	Post      Statement
 	Body      *BlockStatement
 }
 
