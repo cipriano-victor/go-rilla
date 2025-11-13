@@ -79,22 +79,24 @@ func (rs *ReturnStatement) String() string {
 	return out.String()
 }
 
-type ImportStatement struct {
+type BreakStatement struct {
 	Token token.Token
-	Path  *StringLiteral
-	Alias *Identifier
 }
 
-func (is *ImportStatement) statementNode()       {}
-func (is *ImportStatement) TokenLiteral() string { return is.Token.Literal }
-func (is *ImportStatement) String() string {
-	var out bytes.Buffer
-	out.WriteString("import \"")
-	out.WriteString(is.Path.Value)
-	out.WriteString("\" as ")
-	out.WriteString(is.Alias.String())
-	out.WriteString(";")
-	return out.String()
+func (bs *BreakStatement) statementNode()       {}
+func (bs *BreakStatement) TokenLiteral() string { return bs.Token.Literal }
+func (bs *BreakStatement) String() string {
+	return bs.TokenLiteral() + ";"
+}
+
+type ContinueStatement struct {
+	Token token.Token
+}
+
+func (cs *ContinueStatement) statementNode()       {}
+func (cs *ContinueStatement) TokenLiteral() string { return cs.Token.Literal }
+func (cs *ContinueStatement) String() string {
+	return cs.TokenLiteral() + ";"
 }
 
 type ExpressionStatement struct {

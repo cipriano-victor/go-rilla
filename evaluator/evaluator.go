@@ -7,10 +7,14 @@ import (
 )
 
 var (
-	NULL  = &object.Null{}
-	TRUE  = &object.Boolean{Value: true}
-	FALSE = &object.Boolean{Value: false}
+	NULL           = &object.Null{}
+	TRUE           = &object.Boolean{Value: true}
+	FALSE          = &object.Boolean{Value: false}
+	breakSignal    = &object.Break{}
+	continueSignal = &object.Continue{}
 )
+
+var loopDepth int
 
 func Eval(node ast.Node, env *object.Environment) object.Object {
 	switch node := node.(type) {
@@ -34,6 +38,16 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			return val
 		}
 		env.Set(node.Name.Value, val)
+	case *ast.BreakStatement:
+		if loopDepth == 0 {
+			return newError("break statement outside of loop")
+		}
+		return breakSignal
+	case *ast.ContinueStatement:
+		if loopDepth == 0 {
+			return newError("continue statement outside of loop")
+		}
+		return continueSignal
 	// Expressions
 	case *ast.IfExpression:
 		return evalIfExpression(node, env)
@@ -338,9 +352,21 @@ func evalWhileExpression(node *ast.WhileExpression, env *object.Environment) obj
 			}
 		}
 
-		loopResult = Eval(node.Body, env)
-		if shouldHaltLoop(loopResult) {
+		loopDepth++
+		bodyResult := Eval(node.Body, env)
+		loopDepth--
+
+		if isBreak(bodyResult) {
 			return loopResult
+		}
+
+		shouldContinue := false
+		if isContinue(bodyResult) {
+			shouldContinue = true
+		} else if shouldHaltLoop(bodyResult) {
+			return bodyResult
+		} else if bodyResult != nil {
+			loopResult = bodyResult
 		}
 
 		if node.Post != nil {
@@ -348,6 +374,10 @@ func evalWhileExpression(node *ast.WhileExpression, env *object.Environment) obj
 			if shouldHaltLoop(postResult) {
 				return postResult
 			}
+		}
+
+		if shouldContinue {
+			continue
 		}
 	}
 
@@ -360,6 +390,20 @@ func shouldHaltLoop(obj object.Object) bool {
 	}
 	t := obj.Type()
 	return t == object.RETURN_VALUE_OBJ || t == object.ERROR_OBJ
+}
+
+func isBreak(obj object.Object) bool {
+	if obj == nil {
+		return false
+	}
+	return obj.Type() == object.BREAK_OBJ
+}
+
+func isContinue(obj object.Object) bool {
+	if obj == nil {
+		return false
+	}
+	return obj.Type() == object.CONTINUE_OBJ
 }
 
 func evalAssignmentExpression(node *ast.InfixExpression, env *object.Environment) object.Object {
@@ -388,6 +432,10 @@ func evalProgram(program *ast.Program, env *object.Environment) object.Object {
 			return result.Value
 		case *object.Error:
 			return result
+		case *object.Break:
+			return newError("break statement outside of loop")
+		case *object.Continue:
+			return newError("continue statement outside of loop")
 		}
 	}
 	return result
@@ -401,7 +449,10 @@ func evalBlockStatement(block *ast.BlockStatement, env *object.Environment) obje
 
 		if result != nil {
 			rt := result.Type()
-			if rt == object.RETURN_VALUE_OBJ || rt == object.ERROR_OBJ {
+			if rt == object.RETURN_VALUE_OBJ ||
+				rt == object.ERROR_OBJ ||
+				rt == object.BREAK_OBJ ||
+				rt == object.CONTINUE_OBJ {
 				return result
 			}
 		}
@@ -456,7 +507,10 @@ func applyFunction(fn object.Object, args []object.Object) object.Object {
 	switch fn := fn.(type) {
 	case *object.Function:
 		extendedEnv := extendFunctionEnv(fn, args)
+		savedLoopDepth := loopDepth
+		loopDepth = 0
 		evaluated := Eval(fn.Body, extendedEnv)
+		loopDepth = savedLoopDepth
 		return unwrapReturnValue(evaluated)
 	case *object.Builtin:
 		return fn.Fn(args...)

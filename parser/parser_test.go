@@ -102,6 +102,69 @@ func TestReturnStatements(t *testing.T) {
 	}
 }
 
+func TestBreakAndContinueStatements(t *testing.T) {
+	input := `
+break;
+continue;
+`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 2 {
+		t.Fatalf("program.Statements does not contain 2 statements. got=%d",
+			len(program.Statements))
+	}
+
+	if _, ok := program.Statements[0].(*ast.BreakStatement); !ok {
+		t.Fatalf("stmt is not ast.BreakStatement. got=%T", program.Statements[0])
+	}
+	if _, ok := program.Statements[1].(*ast.ContinueStatement); !ok {
+		t.Fatalf("stmt is not ast.ContinueStatement. got=%T", program.Statements[1])
+	}
+}
+
+func TestBreakAndContinueInsideLoop(t *testing.T) {
+	input := `while (true) { break; continue; }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements does not contain 1 statement. got=%d",
+			len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program statement is not ast.ExpressionStatement. got=%T",
+			program.Statements[0])
+	}
+
+	loop, ok := stmt.Expression.(*ast.WhileExpression)
+	if !ok {
+		t.Fatalf("expression is not ast.WhileExpression. got=%T", stmt.Expression)
+	}
+
+	if len(loop.Body.Statements) != 2 {
+		t.Fatalf("loop.Body.Statements does not contain 2 statements. got=%d",
+			len(loop.Body.Statements))
+	}
+
+	if _, ok := loop.Body.Statements[0].(*ast.BreakStatement); !ok {
+		t.Fatalf("first loop statement is not ast.BreakStatement. got=%T",
+			loop.Body.Statements[0])
+	}
+	if _, ok := loop.Body.Statements[1].(*ast.ContinueStatement); !ok {
+		t.Fatalf("second loop statement is not ast.ContinueStatement. got=%T",
+			loop.Body.Statements[1])
+	}
+}
+
 func checkParserErrors(t *testing.T, p *Parser) {
 	errors := p.Errors()
 	if len(errors) == 0 {

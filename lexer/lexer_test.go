@@ -39,6 +39,9 @@ let bigger_int_part = 314.15;
 "foo bar"
 
 [1, 2];
+
+break;
+continue;
 `
 
 	tests := []struct {
@@ -170,6 +173,12 @@ let bigger_int_part = 314.15;
 		{token.COMMA, ","},
 		{token.INTEGER, "2"},
 		{token.RIGHT_BRACKET, "]"},
+		{token.SEMICOLON, ";"},
+
+		{token.BREAK, "break"},
+		{token.SEMICOLON, ";"},
+
+		{token.CONTINUE, "continue"},
 		{token.SEMICOLON, ";"},
 
 		{token.EOF, ""},

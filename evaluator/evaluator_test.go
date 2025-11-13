@@ -665,15 +665,73 @@ func TestAssignmentExpression(t *testing.T) {
 	testIntegerObject(t, evaluated, 5)
 }
 
+func TestBreakStatementEvaluation(t *testing.T) {
+	input := `
+		let i = 0;
+		while (true) {
+			if (i == 3) {
+				break;
+			}
+			i += 1;
+		}
+		i;
+	`
+
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 3)
+}
+
+func TestContinueStatementEvaluation(t *testing.T) {
+	input := `
+		let i = 0;
+		let sum = 0;
+		while (i < 5) {
+			i += 1;
+			if (i == 2) {
+				continue;
+			}
+			sum += i;
+		}
+		sum;
+	`
+
+	evaluated := testEval(input)
+	testIntegerObject(t, evaluated, 13)
+}
+
+func TestBreakContinueOutsideLoop(t *testing.T) {
+	tests := []struct {
+		input   string
+		message string
+	}{
+		{"break;", "break statement outside of loop"},
+		{"continue;", "continue statement outside of loop"},
+		{"fn() { break; }();", "break statement outside of loop"},
+		{"fn() { continue; }();", "continue statement outside of loop"},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		errObj, ok := evaluated.(*object.Error)
+		if !ok {
+			t.Fatalf("expected error for input %q. got=%T (%+v)", tt.input, evaluated, evaluated)
+		}
+		if errObj.Message != tt.message {
+			t.Fatalf("wrong error message for %q. expected=%q, got=%q", tt.input, tt.message, errObj.Message)
+		}
+	}
+}
+
 func TestForLoopEvaluation(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected int64
 	}{
 		{
+			// Se ignora la inicialización de la variable fuera del bucle
 			input: `
 				let result = 0;
-				let i = "hola"; // Se ignora la inicialización de i
+				let i = "hola"; 
 				for (i = 0; i < 5; i = i + 1) {
 					result = result + i;
 				}
@@ -682,6 +740,7 @@ func TestForLoopEvaluation(t *testing.T) {
 			expected: 10,
 		},
 		{
+			// Se declara la variable dentro del bucle
 			input: `
 				let sum = 0;
 				for (let i = 0; i < 3; i += 1) {
@@ -692,6 +751,7 @@ func TestForLoopEvaluation(t *testing.T) {
 			expected: 3,
 		},
 		{
+			// Se inicializa la variable fuera del bucle
 			input: `
 				let i = 0;
 				for (; i < 3; i += 1) {
