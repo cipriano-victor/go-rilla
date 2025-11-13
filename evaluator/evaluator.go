@@ -98,6 +98,23 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		return evalIndexExpression(left, index)
 	case *ast.HashLiteral:
 		return evalHashLiteral(node, env)
+	case *ast.WhileExpression:
+		condition := Eval(node.Condition, env)
+		if isError(condition) {
+			return condition
+		}
+		var result object.Object
+		for isTruthy(condition) {
+			result = Eval(node.Body, env)
+			if isError(result) {
+				return result
+			}
+			condition = Eval(node.Condition, env)
+			if isError(condition) {
+				return condition
+			}
+		}
+		return result
 	}
 
 	return nil

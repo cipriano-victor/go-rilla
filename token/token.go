@@ -63,16 +63,26 @@ const (
 	FALSE = "FALSE"
 	IF    = "IF"
 	ELSE  = "ELSE"
+
+	// Bucles
+	FOR      = "FOR"
+	WHILE    = "WHILE"
+	BREAK    = "BREAK"
+	CONTINUE = "CONTINUE"
 )
 
 var keywords = map[string]TokenType{
-	"fn":     FUNCTION,
-	"let":    LET,
-	"return": RETURN,
-	"true":   TRUE,
-	"false":  FALSE,
-	"if":     IF,
-	"else":   ELSE,
+	"fn":       FUNCTION,
+	"let":      LET,
+	"return":   RETURN,
+	"true":     TRUE,
+	"false":    FALSE,
+	"if":       IF,
+	"else":     ELSE,
+	"for":      FOR,
+	"while":    WHILE,
+	"break":    BREAK,
+	"continue": CONTINUE,
 }
 
 func LookupIdentifier(identifier string) TokenType {

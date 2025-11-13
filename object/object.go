@@ -22,6 +22,7 @@ const (
 	BUILTIN_OBJ      = "BUILTIN"
 	ARRAY_OBJ        = "ARRAY"
 	HASH_OBJ         = "HASH"
+	WHILE_OBJ        = "WHILE"
 )
 
 type Object interface {
@@ -186,4 +187,20 @@ func (h *Hash) Inspect() string {
 
 type Hashable interface {
 	HashKey() HashKey
+}
+
+// While Loop object
+type WhileLoop struct {
+	Condition ast.Expression
+	Body      *ast.BlockStatement
+}
+
+func (wl *WhileLoop) Type() ObjectType { return WHILE_OBJ }
+func (wl *WhileLoop) Inspect() string {
+	var out bytes.Buffer
+	out.WriteString("while ")
+	out.WriteString(wl.Condition.String())
+	out.WriteString(" ")
+	out.WriteString(wl.Body.String())
+	return out.String()
 }

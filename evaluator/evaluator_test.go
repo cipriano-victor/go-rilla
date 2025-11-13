@@ -635,3 +635,18 @@ func testFloatObject(t *testing.T, obj object.Object, expected float64) bool {
 	}
 	return true
 }
+
+func TestWhileExpression(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"let i = 0; let sum = 0; while (i < 5) { sum += i; i += 1; } sum;", 10},
+		{"let i = 0; let sum = 0; while (i < 0) { sum += i; i += 1; } sum;", 0},
+		{"let i = 10; let prod = 100; while (i >= 0) { prod -= i; i -= 1; } prod;", 45},
+	}
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testIntegerObject(t, evaluated, tt.expected)
+	}
+}

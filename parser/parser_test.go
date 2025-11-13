@@ -1085,3 +1085,47 @@ func TestAndOrExpressions(t *testing.T) {
 		}
 	}
 }
+
+func TestWhileExpression(t *testing.T) {
+	input := `while (x < y) { x }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements does not contain 1 statement. got=%d\n",
+			len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+			program.Statements[0])
+	}
+
+	wh, ok := stmt.Expression.(*ast.WhileExpression)
+	if !ok {
+		t.Fatalf("exp not *ast.WhileExpression. got=%T", stmt.Expression)
+	}
+
+	if !testInfixExpression(t, wh.Condition, "x", "<", "y") {
+		return
+	}
+
+	if len(wh.Body.Statements) != 1 {
+		t.Errorf("body is not 1 statements. got=%d\n",
+			len(wh.Body.Statements))
+	}
+
+	body, ok := wh.Body.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("Statements[0] is not ast.ExpressionStatement. got=%T",
+			wh.Body.Statements[0])
+	}
+
+	if !testIdentifier(t, body.Expression, "x") {
+		return
+	}
+}
