@@ -34,7 +34,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 		return &object.ReturnValue{Value: val}
 	case *ast.LetStatement:
-		val := Eval(node.Value, env)
+		val := evalLetValue(node.Value, env)
 		if isError(val) {
 			return val
 		}
@@ -53,6 +53,9 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	case *ast.IfExpression:
 		return evalIfExpression(node, env)
 	case *ast.PrefixExpression:
+		if node.Operator == "++" || node.Operator == "--" {
+			return evalPrefixUpdateExpression(node, env)
+		}
 		right := Eval(node.Right, env)
 		if isError(right) {
 			return right
@@ -294,6 +297,98 @@ func evalNumberInfixExpression(operator string, left, right object.Object, displ
 		return newError("unknown operator: %s %s %s",
 			left.Type(), display, right.Type())
 	}
+}
+
+func evalPrefixUpdateExpression(node *ast.PrefixExpression, env *object.Environment) object.Object {
+	ident, ok := node.Right.(*ast.Identifier)
+	if !ok {
+		return newError("invalid prefix target: %s", node.Right.TokenLiteral())
+	}
+
+	current, ok := env.Get(ident.Value)
+	if !ok {
+		return newError("identifier not found: %s", ident.Value)
+	}
+
+	var result object.Object
+
+	switch node.Operator {
+	case "++":
+		switch current.Type() {
+		case object.INTEGER_OBJ:
+			value := current.(*object.Integer).Value + 1
+			result = &object.Integer{Value: value}
+		case object.FLOAT_OBJ:
+			value := current.(*object.Float).Value + 1
+			result = &object.Float{Value: value}
+		default:
+			return newError("unknown operator: %s%s", current.Type(), node.Operator)
+		}
+	case "--":
+		switch current.Type() {
+		case object.INTEGER_OBJ:
+			value := current.(*object.Integer).Value - 1
+			result = &object.Integer{Value: value}
+		case object.FLOAT_OBJ:
+			value := current.(*object.Float).Value - 1
+			result = &object.Float{Value: value}
+		default:
+			return newError("unknown operator: %s%s", current.Type(), node.Operator)
+		}
+	default:
+		return newError("unknown operator: %s%s", current.Type(), node.Operator)
+	}
+
+	env.Set(ident.Value, result)
+	return result
+}
+
+func evalLetValue(expr ast.Expression, env *object.Environment) object.Object {
+	if prefix, ok := expr.(*ast.PrefixExpression); ok && (prefix.Operator == "++" || prefix.Operator == "--") {
+		ident, ok := prefix.Right.(*ast.Identifier)
+		if !ok {
+			return newError("invalid prefix target: %s", prefix.Right.TokenLiteral())
+		}
+
+		current, ok := env.Get(ident.Value)
+		if !ok {
+			return newError("identifier not found: %s", ident.Value)
+		}
+
+		var updated object.Object
+
+		switch prefix.Operator {
+		case "++":
+			switch current.Type() {
+			case object.INTEGER_OBJ:
+				value := current.(*object.Integer).Value + 1
+				updated = &object.Integer{Value: value}
+			case object.FLOAT_OBJ:
+				value := current.(*object.Float).Value + 1
+				updated = &object.Float{Value: value}
+			default:
+				return newError("unknown operator: %s%s", current.Type(), prefix.Operator)
+			}
+		case "--":
+			switch current.Type() {
+			case object.INTEGER_OBJ:
+				value := current.(*object.Integer).Value - 1
+				updated = &object.Integer{Value: value}
+			case object.FLOAT_OBJ:
+				value := current.(*object.Float).Value - 1
+				updated = &object.Float{Value: value}
+			default:
+				return newError("unknown operator: %s%s", current.Type(), prefix.Operator)
+			}
+		default:
+			return newError("unknown operator: %s%s", current.Type(), prefix.Operator)
+		}
+
+		env.Set(ident.Value, updated)
+		return current
+	}
+
+	return Eval(expr, env)
 }
 
 func evalStringInfixExpression(

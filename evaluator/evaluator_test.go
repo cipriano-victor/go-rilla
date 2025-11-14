@@ -805,3 +805,22 @@ func TestExponentiationOperator(t *testing.T) {
 		testIntegerObject(t, evaluated, tt.expected)
 	}
 }
+
+func TestIncrementDecrementPrefix(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"let a = 5; ++a; a;", 6},
+		{"let a = 5; --a; a;", 4},
+		{"let a = 5; ++a + ++a;", 13},
+		{"let a = 5; --a + --a;", 7},
+		{"let a = 5; let b = ++a; a + b;", 11},
+		{"let a = 5; let b = --a; a + b;", 9},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testIntegerObject(t, evaluated, tt.expected)
+	}
+}
