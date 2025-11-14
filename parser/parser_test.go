@@ -795,6 +795,50 @@ func testInfixExpression(t *testing.T, exp ast.Expression, left interface{},
 	return true
 }
 
+func TestPostfixExpression(t *testing.T) {
+	postfixTests := []struct {
+		input    string
+		operator string
+		value    interface{}
+	}{
+		{"x++;", "++", "x"},
+		{"y--;", "--", "y"},
+	}
+
+	for _, tt := range postfixTests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserErrors(t, p)
+
+		if len(program.Statements) != 1 {
+			t.Fatalf("program.Statements does not contain 1 statement. got=%d\n",
+				len(program.Statements))
+		}
+
+		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+				program.Statements[0])
+		}
+
+		exp, ok := stmt.Expression.(*ast.PostfixExpression)
+		if !ok {
+			t.Fatalf("stmt.Expression is not ast.PostfixExpression. got=%T",
+				stmt.Expression)
+		}
+
+		if exp.Operator != tt.operator {
+			t.Fatalf("exp.Operator is not '%s'. got=%s",
+				tt.operator, exp.Operator)
+		}
+
+		if !testLiteralExpression(t, exp.Left, tt.value) {
+			return
+		}
+	}
+}
+
 func TestFunctionLiteralParsing(t *testing.T) {
 	input := `fn(x, y) { x + y; }`
 
@@ -1246,5 +1290,43 @@ func TestForLoop(t *testing.T) {
 
 	if len(callExp.Arguments) != 0 {
 		t.Fatalf("expected 0 arguments, got=%d", len(callExp.Arguments))
+	}
+}
+
+func TestExponentialOperator(t *testing.T) {
+	input := "2 ** 3;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements does not contain 1 statement. got=%d\n",
+			len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+			program.Statements[0])
+	}
+
+	exp, ok := stmt.Expression.(*ast.InfixExpression)
+	if !ok {
+		t.Fatalf("stmt.Expression is not ast.InfixExpression. got=%T",
+			stmt.Expression)
+	}
+
+	if !testLiteralExpression(t, exp.Left, 2) {
+		return
+	}
+
+	if exp.Operator != "**" {
+		t.Fatalf("exp.Operator is not '**'. got=%s",
+			exp.Operator)
+	}
+
+	if !testLiteralExpression(t, exp.Right, 3) {
+		return
 	}
 }

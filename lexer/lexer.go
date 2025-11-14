@@ -98,6 +98,9 @@ func (l *Lexer) NextToken() token.Token {
 	case '!':
 		return makeTwoCharacterToken(l, '=', token.NOT_EQUAL, token.BANG, start)
 	case '+':
+		if l.peekCharacter() == '+' {
+			return makeTwoCharacterToken(l, '+', token.PLUS_PLUS, token.PLUS, start)
+		}
 		return makeTwoCharacterToken(l, '=', token.SUM_ASSIGN, token.PLUS, start)
 	case '(':
 		tok = newToken(token.LEFT_PARENTHESIS, l.character, start, l.afterCurrent())
@@ -124,15 +127,16 @@ func (l *Lexer) NextToken() token.Token {
 		l.readCharacter()
 		return tok
 	case '-':
+		if l.peekCharacter() == '-' {
+			return makeTwoCharacterToken(l, '-', token.MINUS_MINUS, token.MINUS, start)
+		}
 		return makeTwoCharacterToken(l, '=', token.SUB_ASSIGN, token.MINUS, start)
 	case '/':
 		tok = newToken(token.SLASH, l.character, start, l.afterCurrent())
 		l.readCharacter()
 		return tok
 	case '*':
-		tok = newToken(token.ASTERISK, l.character, start, l.afterCurrent())
-		l.readCharacter()
-		return tok
+		return makeTwoCharacterToken(l, '*', token.STAR_STAR, token.STAR, start)
 	case '<':
 		return makeTwoCharacterToken(l, '=', token.LESS_EQUAL, token.LESS_THAN, start)
 	case '>':

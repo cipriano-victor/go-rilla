@@ -42,6 +42,10 @@ let bigger_int_part = 314.15;
 
 break;
 continue;
+
+i++;
+i--;
+i**2;
 `
 
 	tests := []struct {
@@ -51,7 +55,7 @@ continue;
 		{token.BANG, "!"},
 		{token.MINUS, "-"},
 		{token.SLASH, "/"},
-		{token.ASTERISK, "*"},
+		{token.STAR, "*"},
 		{token.GREATER_EQUAL, ">="},
 		{token.LESS_EQUAL, "<="},
 		{token.ILLEGAL, "¿"},
@@ -179,6 +183,19 @@ continue;
 		{token.SEMICOLON, ";"},
 
 		{token.CONTINUE, "continue"},
+		{token.SEMICOLON, ";"},
+
+		{token.IDENTIFIER, "i"},
+		{token.PLUS_PLUS, "++"},
+		{token.SEMICOLON, ";"},
+
+		{token.IDENTIFIER, "i"},
+		{token.MINUS_MINUS, "--"},
+		{token.SEMICOLON, ";"},
+
+		{token.IDENTIFIER, "i"},
+		{token.STAR_STAR, "**"},
+		{token.INTEGER, "2"},
 		{token.SEMICOLON, ";"},
 
 		{token.EOF, ""},

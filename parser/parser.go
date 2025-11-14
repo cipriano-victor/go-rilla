@@ -10,13 +10,14 @@ import (
 )
 
 type Parser struct {
-	l              *lexer.Lexer
-	currentToken   token.Token
-	peekToken      token.Token
-	errors         []string
-	prefixParseFns map[token.TokenType]prefixParseFn
-	infixParseFns  map[token.TokenType]infixParseFn
-	diagnostics    []diag.Diagnostic
+	l               *lexer.Lexer
+	currentToken    token.Token
+	peekToken       token.Token
+	errors          []string
+	prefixParseFns  map[token.TokenType]prefixParseFn
+	infixParseFns   map[token.TokenType]infixParseFn
+	postfixParseFns map[token.TokenType]postfixParseFn
+	diagnostics     []diag.Diagnostic
 }
 
 func (p *Parser) Diagnostics() []diag.Diagnostic { return p.diagnostics }
@@ -27,6 +28,10 @@ func (p *Parser) addDiag(d diag.Diagnostic) {
 
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{l: l, errors: []string{}}
+
+	p.postfixParseFns = make(map[token.TokenType]postfixParseFn)
+	p.registerPostfix(token.PLUS_PLUS, p.parseIncrementExpression)
+	p.registerPostfix(token.MINUS_MINUS, p.parseDecrementExpression)
 
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
 	p.registerPrefix(token.IDENTIFIER, p.parseIdentifier)
@@ -48,7 +53,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
 	p.registerInfix(token.MINUS, p.parseInfixExpression)
-	p.registerInfix(token.ASTERISK, p.parseInfixExpression)
+	p.registerInfix(token.STAR, p.parseInfixExpression)
 	p.registerInfix(token.SLASH, p.parseInfixExpression)
 	p.registerInfix(token.ASSIGN, p.parseInfixExpression)
 	p.registerInfix(token.EQUALS, p.parseInfixExpression)
@@ -64,6 +69,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.LEFT_PARENTHESIS, p.parseCallExpression)
 	p.registerInfix(token.DOT, p.parseMemberExpression)
 	p.registerInfix(token.LEFT_BRACKET, p.parseIndexExpression)
+	p.registerInfix(token.STAR_STAR, p.parseExponentiationExpression)
 
 	// Leer dos tokens, para inicializar currentToken y peekToken
 	p.nextToken()
@@ -178,8 +184,9 @@ func (p *Parser) parseContinueStatement() *ast.ContinueStatement {
 }
 
 type (
-	prefixParseFn func() ast.Expression
-	infixParseFn  func(ast.Expression) ast.Expression
+	prefixParseFn  func() ast.Expression
+	infixParseFn   func(ast.Expression) ast.Expression
+	postfixParseFn func(ast.Expression) ast.Expression
 )
 
 func (p *Parser) registerPrefix(tokenType token.TokenType, fn prefixParseFn) {
@@ -188,6 +195,10 @@ func (p *Parser) registerPrefix(tokenType token.TokenType, fn prefixParseFn) {
 
 func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
 	p.infixParseFns[tokenType] = fn
+}
+
+func (p *Parser) registerPostfix(tokenType token.TokenType, fn postfixParseFn) {
+	p.postfixParseFns[tokenType] = fn
 }
 
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
@@ -206,10 +217,12 @@ const (
 	LESSGREATER // >, <, <=, >=
 	SUM         // +, -, +=, -=
 	PRODUCT     // *, /
+	EXP         // **
 	PREFIX      // -X or !X
 	CALL        // myFunction(X)
 	SELECT      // a.b
 	INDEX       // array[index]
+	POSTFIX     // X++, X--
 )
 
 func (p *Parser) parseExpression(precedence int) ast.Expression {
@@ -221,6 +234,12 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	leftExp := prefix()
 
 	for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
+		if postfix, ok := p.postfixParseFns[p.peekToken.Type]; ok {
+			p.nextToken()
+			leftExp = postfix(leftExp)
+			continue
+		}
+
 		infix := p.infixParseFns[p.peekToken.Type]
 		if infix == nil {
 			return leftExp
@@ -306,11 +325,14 @@ var precedences = map[token.TokenType]int{
 	token.MINUS:            SUM,
 	token.SUM_ASSIGN:       SUM,
 	token.SUB_ASSIGN:       SUM,
-	token.ASTERISK:         PRODUCT,
+	token.STAR:             PRODUCT,
 	token.SLASH:            PRODUCT,
+	token.STAR_STAR:        EXP,
 	token.LEFT_PARENTHESIS: CALL,
 	token.DOT:              SELECT,
 	token.LEFT_BRACKET:     INDEX,
+	token.PLUS_PLUS:        POSTFIX,
+	token.MINUS_MINUS:      POSTFIX,
 }
 
 func (p *Parser) peekPrecedence() int {
@@ -332,6 +354,14 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	precedence := p.currentPrecedence()
 	p.nextToken()
 	expression.Right = p.parseExpression(precedence)
+	return expression
+}
+
+func (p *Parser) parseExponentiationExpression(left ast.Expression) ast.Expression {
+	expression := &ast.InfixExpression{Token: p.currentToken, Operator: infixOperatorLiteral(p.currentToken), Left: left}
+	precedence := p.currentPrecedence()
+	p.nextToken()
+	expression.Right = p.parseExpression(precedence - 1)
 	return expression
 }
 
@@ -571,5 +601,15 @@ func (p *Parser) parseForLoop() ast.Expression {
 	body := p.parseBlockStatement()
 	expression.Body = body
 
+	return expression
+}
+
+func (p *Parser) parseIncrementExpression(left ast.Expression) ast.Expression {
+	expression := &ast.PostfixExpression{Token: p.currentToken, Operator: p.currentToken.Literal, Left: left}
+	return expression
+}
+
+func (p *Parser) parseDecrementExpression(left ast.Expression) ast.Expression {
+	expression := &ast.PostfixExpression{Token: p.currentToken, Operator: p.currentToken.Literal, Left: left}
 	return expression
 }

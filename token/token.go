@@ -26,7 +26,7 @@ const (
 	BANG         = "!"
 	MINUS        = "-"
 	SLASH        = "/"
-	ASTERISK     = "*"
+	STAR         = "*"
 	LESS_THAN    = "<"
 	GREATER_THAN = ">"
 
@@ -39,6 +39,9 @@ const (
 	OR            = "||"
 	SUM_ASSIGN    = "+="
 	SUB_ASSIGN    = "-="
+	PLUS_PLUS     = "++"
+	MINUS_MINUS   = "--"
+	STAR_STAR     = "**"
 
 	// Delimitadores
 	COMMA     = ","

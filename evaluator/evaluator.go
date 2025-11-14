@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go-rilla/ast"
 	"go-rilla/object"
+	"math"
 )
 
 var (
@@ -73,6 +74,8 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			return right
 		}
 		return evalInfixExpression(node.Operator, left, right, node.Operator)
+	case *ast.PostfixExpression:
+		return evalPostfixExpression(node, env)
 	case *ast.IntegerLiteral:
 		return &object.Integer{Value: node.Value}
 	case *ast.FloatLiteral:
@@ -269,6 +272,12 @@ func evalNumberInfixExpression(operator string, left, right object.Object, displ
 			return &object.Integer{Value: int64(leftVal / rightVal)}
 		}
 		return &object.Float{Value: leftVal / rightVal}
+	case "**":
+		result := math.Pow(leftVal, rightVal)
+		if left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ {
+			return &object.Integer{Value: int64(result)}
+		}
+		return &object.Float{Value: result}
 	case "<":
 		return nativeBoolToBooleanObject(leftVal < rightVal)
 	case ">":
@@ -592,4 +601,48 @@ func evalHashIndexExpression(hash, index object.Object) object.Object {
 		return NULL
 	}
 	return pair.Value
+}
+
+func evalPostfixExpression(node *ast.PostfixExpression, env *object.Environment) object.Object {
+	identifier, ok := node.Left.(*ast.Identifier)
+	if !ok {
+		return newError("invalid postfix target: %s", node.Left.TokenLiteral())
+	}
+
+	current := Eval(node.Left, env)
+	if isError(current) {
+		return current
+	}
+
+	var result object.Object
+
+	switch node.Operator {
+	case "++":
+		switch current.Type() {
+		case object.INTEGER_OBJ:
+			value := current.(*object.Integer).Value + 1
+			result = &object.Integer{Value: value}
+		case object.FLOAT_OBJ:
+			value := current.(*object.Float).Value + 1
+			result = &object.Float{Value: value}
+		default:
+			return newError("unknown operator: %s%s", current.Type(), node.Operator)
+		}
+	case "--":
+		switch current.Type() {
+		case object.INTEGER_OBJ:
+			value := current.(*object.Integer).Value - 1
+			result = &object.Integer{Value: value}
+		case object.FLOAT_OBJ:
+			value := current.(*object.Float).Value - 1
+			result = &object.Float{Value: value}
+		default:
+			return newError("unknown operator: %s%s", current.Type(), node.Operator)
+		}
+	default:
+		return newError("unknown operator: %s%s", current.Type(), node.Operator)
+	}
+
+	env.Set(identifier.Value, result)
+	return current
 }

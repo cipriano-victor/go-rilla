@@ -767,3 +767,41 @@ func TestForLoopEvaluation(t *testing.T) {
 		testIntegerObject(t, evaluated, tt.expected)
 	}
 }
+
+func TestPostfixOperators(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"let a = 5; a++; a;", 6},
+		{"let a = 5; a--; a;", 4},
+		{"let a = 5; a++ + a++;", 11},
+		{"let a = 5; a-- + a--;", 9},
+		{"let a = 5; let b = a++; a + b;", 11},
+		{"let a = 5; let b = a--; a + b;", 9},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testIntegerObject(t, evaluated, tt.expected)
+	}
+}
+
+func TestExponentiationOperator(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected int64
+	}{
+		{"2 ** 3", 8},
+		{"3 ** 2", 9},
+		{"2 ** 0", 1},
+		{"5 ** 1", 5},
+		{"2 ** 3 ** 2", 512},  // 2 ** (3 ** 2) = 2 ** 9 = 512
+		{"(2 ** 3) ** 2", 64}, // (2 ** 3) ** 2 = 8 ** 2 = 64
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		testIntegerObject(t, evaluated, tt.expected)
+	}
+}
