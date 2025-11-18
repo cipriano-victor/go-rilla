@@ -11,6 +11,7 @@ import (
 
 func main() {
 	mode := flag.String("mode", string(repl.ModeEvaluator), "execution mode: evaluator, scanner or parser")
+	file := flag.String("file", "", "Monkey source file (.monkey) to execute")
 	flag.Parse()
 
 	selectedMode := repl.ModeParser
@@ -24,6 +25,14 @@ func main() {
 	default:
 		fmt.Fprintf(os.Stderr, "unknown mode %q; valid values are %q, %q or %q\n", *mode, repl.ModeParser, repl.ModeScanner, repl.ModeEvaluator)
 		os.Exit(2)
+	}
+
+	if *file != "" {
+		if err := runFile(selectedMode, *file); err != nil {
+			fmt.Fprintf(os.Stderr, "could not read %q: %v\n", *file, err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	currentUser, err := user.Current()
@@ -45,4 +54,14 @@ func main() {
 	default:
 		repl.StartEvaluator(os.Stdin, os.Stdout)
 	}
+}
+
+func runFile(mode repl.Mode, path string) error {
+	source, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	repl.RunScript(mode, path, string(source), os.Stdout)
+	return nil
 }

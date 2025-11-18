@@ -33,12 +33,31 @@ const GORILLA_FACE = `
       \      |        /
        '.    |     .'
          '-.___.-'
-		 
+		
 `
+const defaultSourceName = "<repl>"
 
 func StartEvaluator(in io.Reader, out io.Writer) { startRepl(ModeEvaluator, in, out) }
 func StartParser(in io.Reader, out io.Writer)    { startRepl(ModeParser, in, out) }
 func StartScanner(in io.Reader, out io.Writer)   { startRepl(ModeScanner, in, out) }
+
+func RunScript(mode Mode, sourceName, source string, out io.Writer) {
+	var env *object.Environment
+	if mode == ModeEvaluator {
+		env = object.NewEnvironment()
+	}
+
+	switch mode {
+	case ModeScanner:
+		runScanner(source, sourceName, out)
+	case ModeParser:
+		runParser(source, sourceName, out)
+	case ModeEvaluator:
+		runEvaluator(source, sourceName, out, env)
+	default:
+		runEvaluator(source, sourceName, out, env)
+	}
+}
 
 func startRepl(mode Mode, in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
@@ -59,40 +78,40 @@ func startRepl(mode Mode, in io.Reader, out io.Writer) {
 			return
 		}
 
-		env = processLine(mode, line, out, env)
+		env = processLine(mode, line, defaultSourceName, out, env)
 	}
 }
 
-func processLine(mode Mode, line string, out io.Writer, env *object.Environment) *object.Environment {
+func processLine(mode Mode, line, sourceName string, out io.Writer, env *object.Environment) *object.Environment {
 	switch mode {
 	case ModeScanner:
-		runScanner(line, out)
+		runScanner(line, sourceName, out)
 	case ModeParser:
-		runParser(line, out)
+		runParser(line, sourceName, out)
 	case ModeEvaluator:
-		runEvaluator(line, out, env)
+		runEvaluator(line, sourceName, out, env)
 	default:
-		runEvaluator(line, out, env)
+		runEvaluator(line, sourceName, out, env)
 	}
 	return env
 }
 
-func StartProgram(line string, out io.Writer) (*lexer.Lexer, *parser.Parser, *ast.Program) {
+func StartProgram(line, sourceName string, out io.Writer) (*lexer.Lexer, *parser.Parser, *ast.Program) {
 	l := lexer.New(line)
 	p := parser.New(l)
 	program := p.ParseProgram()
 
 	if len(p.Errors()) != 0 {
 		printParserErrors(out, p.Errors())
-		writeDiagnostics(l, p, line, out)
+		writeDiagnostics(l, p, sourceName, line, out)
 		return nil, nil, nil
 	}
 
 	return l, p, program
 }
 
-func runEvaluator(line string, out io.Writer, env *object.Environment) {
-	l, p, program := StartProgram(line, out)
+func runEvaluator(line, sourceName string, out io.Writer, env *object.Environment) {
+	l, p, program := StartProgram(line, sourceName, out)
 	if l == nil || p == nil || program == nil {
 		return
 	}
@@ -103,11 +122,11 @@ func runEvaluator(line string, out io.Writer, env *object.Environment) {
 		io.WriteString(out, "\n")
 	}
 
-	writeDiagnostics(l, p, line, out)
+	writeDiagnostics(l, p, sourceName, line, out)
 }
 
-func runParser(line string, out io.Writer) {
-	l, p, program := StartProgram(line, out)
+func runParser(line, sourceName string, out io.Writer) {
+	l, p, program := StartProgram(line, sourceName, out)
 	if l == nil || p == nil || program == nil {
 		return
 	}
@@ -116,10 +135,10 @@ func runParser(line string, out io.Writer) {
 	io.WriteString(out, "\n")
 
 	// Util para warnings aún con el parseo correcto
-	writeDiagnostics(l, p, line, out)
+	writeDiagnostics(l, p, sourceName, line, out)
 }
 
-func runScanner(line string, out io.Writer) {
+func runScanner(line, sourceName string, out io.Writer) {
 	l := lexer.New(line)
 	for {
 		tok := l.NextToken()
@@ -130,7 +149,7 @@ func runScanner(line string, out io.Writer) {
 	}
 
 	if ds := l.Diagnostics(); len(ds) > 0 {
-		io.WriteString(out, diagprint.RenderPlain("<repl>", line, ds))
+		io.WriteString(out, diagprint.RenderPlain(sourceName, line, ds))
 	}
 }
 
@@ -143,11 +162,11 @@ func printParserErrors(out io.Writer, errors []string) {
 	}
 }
 
-func writeDiagnostics(l *lexer.Lexer, p *parser.Parser, source string, out io.Writer) {
+func writeDiagnostics(l *lexer.Lexer, p *parser.Parser, sourceName, source string, out io.Writer) {
 	if ds := l.Diagnostics(); len(ds) > 0 {
-		io.WriteString(out, diagprint.RenderPlain("<repl>", source, ds))
+		io.WriteString(out, diagprint.RenderPlain(sourceName, source, ds))
 	}
 	if pds := p.Diagnostics(); len(pds) > 0 {
-		io.WriteString(out, diagprint.RenderPlain("<repl>", source, pds))
+		io.WriteString(out, diagprint.RenderPlain(sourceName, source, pds))
 	}
 }
