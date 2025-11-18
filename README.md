@@ -33,7 +33,6 @@ Respecto a la implementación original del libro, Go-Rilla incluye las siguiente
     - Cachear las hashkeys para mejorar el rendimiento...
 
 - Adicionales: 
-    - Operador módulo.
     - Operador ternario
     - Comentarios (simples y multilínea)
     - Warnings.
