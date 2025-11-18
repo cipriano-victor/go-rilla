@@ -27,6 +27,8 @@ func TestEvalIntegerExpression(t *testing.T) {
 		{"3 * 3 * 3 + 10", 37},
 		{"3 * (3 * 3) + 10", 37},
 		{"(5 + 10 * 2 + 15 / 3) * 2 + -10", 50},
+		{"10 % 3", 1},
+		{"-5 % 3", -2},
 	}
 	for _, tt := range tests {
 		evaluated := testEval(tt.input)
@@ -619,6 +621,7 @@ func TestEvalFloatExpression(t *testing.T) {
 		{"5 - 2.5 * 10", -20.0},
 		{"let a = 5.5; a += 4.5; a;", 10.0},
 		{"let a = 10.0; a -= 4.0; a;", 6.0},
+		{"3.5 % 2.0", 1.5},
 	}
 	for _, tt := range tests {
 		evaluated := testEval(tt.input)

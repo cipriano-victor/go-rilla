@@ -166,7 +166,10 @@ func (l *Lexer) NextToken() token.Token {
 		}
 		l.readCharacter() // consumir comilla de cierre
 		return token.Token{Type: token.STRING, Literal: s, Range: source.Range{Start: start, End: end}}
-
+	case '%':
+		tok = newToken(token.PERCENT, l.character, start, l.afterCurrent())
+		l.readCharacter()
+		return tok
 	case 0:
 		return token.Token{Type: token.EOF, Literal: "", Range: source.Range{Start: start, End: start}}
 	default:

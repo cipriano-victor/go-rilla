@@ -29,6 +29,7 @@ const (
 	STAR         = "*"
 	LESS_THAN    = "<"
 	GREATER_THAN = ">"
+	PERCENT      = "%"
 
 	// Operadores de dos caracteres
 	LESS_EQUAL    = "<="

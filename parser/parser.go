@@ -68,8 +68,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.SUB_ASSIGN, p.parseInfixExpression)
 	p.registerInfix(token.AND, p.parseInfixExpression)
 	p.registerInfix(token.OR, p.parseInfixExpression)
+	p.registerInfix(token.PERCENT, p.parseInfixExpression)
 	p.registerInfix(token.LEFT_PARENTHESIS, p.parseCallExpression)
-	p.registerInfix(token.DOT, p.parseMemberExpression)
 	p.registerInfix(token.LEFT_BRACKET, p.parseIndexExpression)
 	p.registerInfix(token.STAR_STAR, p.parseExponentiationExpression)
 
@@ -329,6 +329,7 @@ var precedences = map[token.TokenType]int{
 	token.SUB_ASSIGN:       SUM,
 	token.STAR:             PRODUCT,
 	token.SLASH:            PRODUCT,
+	token.PERCENT:          PRODUCT,
 	token.STAR_STAR:        EXP,
 	token.LEFT_PARENTHESIS: CALL,
 	token.DOT:              SELECT,
@@ -365,16 +366,6 @@ func (p *Parser) parseExponentiationExpression(left ast.Expression) ast.Expressi
 	p.nextToken()
 	expression.Right = p.parseExpression(precedence - 1)
 	return expression
-}
-
-func (p *Parser) parseMemberExpression(left ast.Expression) ast.Expression {
-	exp := &ast.MemberExpression{Token: p.currentToken, Object: left}
-	if !p.expectPeek(token.IDENTIFIER) {
-		return nil
-	}
-	ident := &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal}
-	exp.Property = ident
-	return exp
 }
 
 func infixOperatorLiteral(tok token.Token) string {

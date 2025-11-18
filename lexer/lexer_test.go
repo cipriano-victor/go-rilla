@@ -46,6 +46,7 @@ continue;
 i++;
 i--;
 i**2;
+i%2;
 `
 
 	tests := []struct {
@@ -195,6 +196,11 @@ i**2;
 
 		{token.IDENTIFIER, "i"},
 		{token.STAR_STAR, "**"},
+		{token.INTEGER, "2"},
+		{token.SEMICOLON, ";"},
+
+		{token.IDENTIFIER, "i"},
+		{token.PERCENT, "%"},
 		{token.INTEGER, "2"},
 		{token.SEMICOLON, ";"},
 

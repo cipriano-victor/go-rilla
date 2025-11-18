@@ -271,6 +271,9 @@ func evalNumberInfixExpression(operator string, left, right object.Object, displ
 		}
 		return &object.Float{Value: leftVal * rightVal}
 	case "/":
+		if rightVal == 0 {
+			return newError("division by zero")
+		}
 		if left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ {
 			return &object.Integer{Value: int64(leftVal / rightVal)}
 		}
@@ -281,6 +284,14 @@ func evalNumberInfixExpression(operator string, left, right object.Object, displ
 			return &object.Integer{Value: int64(result)}
 		}
 		return &object.Float{Value: result}
+	case "%":
+		if rightVal == 0 {
+			return newError("division by zero")
+		}
+		if left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ {
+			return &object.Integer{Value: int64(int64(leftVal) % int64(rightVal))}
+		}
+		return &object.Float{Value: math.Mod(leftVal, rightVal)}
 	case "<":
 		return nativeBoolToBooleanObject(leftVal < rightVal)
 	case ">":
